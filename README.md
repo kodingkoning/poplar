@@ -6,15 +6,21 @@ Popular is a software pipeline that uses an input of genes and assembled genomes
 
 ## Dependencies
 
-Before running, you must have already installed:
+Required dependencies:
 
+- [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)
 - [numpy](https://numpy.org/)
-- [sklearn](https://scikit-learn.org/stable/index.html)
+- [sklearn 1.3.0](https://scikit-learn.org/stable/index.html)
 - [biopython](https://biopython.org/docs/1.75/api/Bio.html)
 
 Recommended installation:
 
-`pip install biopython numpy sklearn`
+```
+conda create -n poplar_env python=3.10 numpy scikit-learn biopython
+conda activate poplar_env
+```
+
+Run the pipeline with the environment activated.
 
 ## Input
 
@@ -49,8 +55,6 @@ Jobs spawn other jobs and then wait for their completition. If jobs are forced t
 There are currently not any checkpointing implemented. If the pipeline crashes, then the preceeding steps need to be rerun rather than continue from where it was left off. (TODO: add checkpointing)
 
 TODO: make a way to pick the time limits and queues for all of the scripts
-
-TODO: take out the places where it activates the biopython env. List dependencies
 
 TODO: figure out why the full Kickxellomycotina set gets an error with one of the inputs (shows as "" query)
 

@@ -4,9 +4,6 @@
 #SBATCH --ntasks=1
 #SBATCH -p QUEUE
 
-module load python/3.10.8
-source ~/biopython/bin/activate
-#source /home/erkonin/biopython/bin/activate
 # check if script is started via SLURM or bash
 # if with SLURM: there variable '$SLURM_JOB_ID' will exist
 # `if [ -n $SLURM_JOB_ID ]` checks if $SLURM_JOB_ID is not an empty string

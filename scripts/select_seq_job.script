@@ -1,0 +1,19 @@
+#!/bin/bash
+#SBATCH --job-name=select_seq
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+
+export PATH=$PATH:/home/erkonin/daily_notes/raxml-ng/build/bin:/home/erkonin/daily_notes/gene_trees
+if [ "$SLURM_ARRAY_TASK_ID" == "" ]; then
+        SLURM_ARRAY_TASK_ID=0
+fi
+
+input_files=(seq.list.part.*)
+INPUT_FILE=${input_files[$SLURM_ARRAY_TASK_ID]}
+
+echo input = $INPUT_FILE
+
+while read input; do
+        search_list=$(grep -f ${input} -l *.fasta)
+	seqkit grep -f ${input} -o ${input}.fasta ${search_list} && rm ${input}
+done < ${INPUT_FILE}

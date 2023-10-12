@@ -1,0 +1,21 @@
+#!/bin/bash
+#SBATCH --job-name=group
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+
+module load python/3.10.8
+source ~/biopython/bin/activate
+cat *.tab > blast_results.csv
+
+if [ -n $SLURM_JOB_ID ];  then
+    # check the original location through scontrol and $SLURM_JOB_ID
+    SCRIPT_PATH=$(scontrol show job $SLURM_JOBID | awk -F= '/Command=/{print $2}' | cut -d' ' -f1)
+else
+    # otherwise: started with bash. Get the real location.
+    SCRIPT_PATH=$(realpath $0)
+fi
+
+# getting location of software_name 
+SHARED_PATH=$(dirname ${SCRIPT_PATH})
+
+time python ${SHARED_PATH}/group.py 

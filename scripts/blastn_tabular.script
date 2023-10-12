@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --job-name=blastn_tab
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+
+# Use BLAST+ version 2.14
+# Install from: https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/
+export PATH=$PATH:/home/erkonin/daily_notes/BLAST/ncbi-blast-2.14.1+/bin
+
+input_files=(*.fasta)
+INPUT_FILE=${input_files[$SLURM_ARRAY_TASK_ID]}
+
+# Standard operating procedure for MycoCosm is blastx with -evalue 1e-5
+echo query = ${INPUT_FILE}
+blastn -query ${INPUT_FILE} -db fungi.db -out blast_results${SLURM_ARRAY_TASK_ID}.tab -task dc-megablast -evalue 1e-20 -outfmt "6 qaccver saccver evalue" -num_threads 32

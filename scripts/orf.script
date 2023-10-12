@@ -1,0 +1,38 @@
+#!/bin/bash
+#SBATCH --job-name=blastn
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+
+# check if script is started via SLURM or bash
+# if with SLURM: there variable '$SLURM_JOB_ID' will exist
+# `if [ -n $SLURM_JOB_ID ]` checks if $SLURM_JOB_ID is not an empty string
+if [ -n $SLURM_JOB_ID ];  then
+    # check the original location through scontrol and $SLURM_JOB_ID
+    SCRIPT_PATH=$(scontrol show job $SLURM_JOBID | awk -F= '/Command=/{print $2}' | cut -d' ' -f1)
+else
+    # otherwise: started with bash. Get the real location.
+    SCRIPT_PATH=$(realpath $0)
+fi
+
+SHARED_PATH=$(dirname ${SCRIPT_PATH})
+
+QUERY_FILE=$1
+infile=$2
+CATALOG_PATH=$3
+line_num=$((${SLURM_ARRAY_TASK_ID}+1))
+line=`sed "${line_num}q;d" $infile`
+
+read name file <<< $line
+
+SUBJECT_FILE=${CATALOG_PATH}/${file}
+OUT_FILE=blast_${name}.fasta
+ORF_OUT_FILE=orf_${name}.fasta
+
+# Standard operating procedure for MycoCosm is blastx with -evalue 1e-5
+echo query = ${QUERY_FILE}
+echo subject = ${SUBJECT_FILE}
+echo output = ${OUT_FILE}
+orfipy --dna ${ORF_OUT_FILE} --ignore-case --outdir $PWD --min 1000 ${SUBJECT_FILE}
+cat ${ORF_OUT_FILE} | ${SHARED_PATH}/seqkit replace --f-by-name -p '.*' -r "${name}_gene{nr}" > ${OUT_FILE}
+rm ${ORF_OUT_FILE}
+echo "Completed orf.script"

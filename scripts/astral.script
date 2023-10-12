@@ -1,0 +1,14 @@
+#!/bin/sh
+#SBATCH --job-name=astral-pro
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=2:30:00
+
+export PATH=$PATH:/home/erkonin/daily_notes/gene_trees/raxml/from_annotation/astralpro/ASTER-Linux/bin
+
+cat *.bestTree > all_trees.out
+sed -i 's/_gene[^:]*//g' all_trees.out
+sed -i 's/_ORF[^:]*//g' all_trees.out
+sed -i 's/_DN[^:]*//g' all_trees.out
+
+astral-pro -i all_trees.out -o $1

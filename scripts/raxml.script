@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH --job-name=raxml
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+
+# check if script is started via SLURM or bash
+# if with SLURM: there variable '$SLURM_JOB_ID' will exist
+# `if [ -n $SLURM_JOB_ID ]` checks if $SLURM_JOB_ID is not an empty string
+if [ -n $SLURM_JOB_ID ];  then
+    # check the original location through scontrol and $SLURM_JOB_ID
+    SCRIPT_PATH=$(scontrol show job $SLURM_JOBID | awk -F= '/Command=/{print $2}' | cut -d' ' -f1)
+else
+    # otherwise: started with bash. Get the real location.
+    SCRIPT_PATH=$(realpath $0)
+fi
+
+# getting location of software_name 
+SHARED_PATH=$(dirname ${SCRIPT_PATH})
+
+input_files=(*.seq_list.fasta.aln)
+FILE_COUNT=${#input_files[@]}
+FILE_COUNT=$(( $FILE_COUNT - 1 ))
+
+PARTS=50
+
+if (( ${FILE_COUNT} < ${PARTS} )); then
+        PARTS=${FILE_COUNT}
+fi
+
+rm seq.list*
+#ls ${input_files} > seq.list
+ls *.aln > seq.list
+split -n l/${PARTS} seq.list seq.list.part.
+sbatch --array=1-${PARTS} --wait ${SHARED_PATH}/raxml_job.script &
+${SHARED_PATH}/raxml_job.script
+wait

@@ -1,0 +1,67 @@
+#!/bin/bash
+#SBATCH --job-name=extract_fasta
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+
+infile=$1
+
+if [ -z "$1" ]; then
+	echo Error: Input file is required
+	exit 1
+fi
+
+if [ ! -f ${infile} ]; then
+	echo Error: Input file does not exist
+	exit 1
+fi
+
+# check if script is started via SLURM or bash
+# if with SLURM: there variable '$SLURM_JOB_ID' will exist
+# `if [ -n $SLURM_JOB_ID ]` checks if $SLURM_JOB_ID is not an empty string
+if [ -n $SLURM_JOB_ID ];  then
+    # check the original location through scontrol and $SLURM_JOB_ID
+    SCRIPT_PATH=$(scontrol show job ${SLURM_JOBID}_${SLURM_ARRAY_TASK_ID} | awk -F= '/Command=/{print $2}' | cut -d' ' -f1)
+else
+    # otherwise: started with bash. Get the real location.
+    SCRIPT_PATH=$(realpath $0)
+fi
+
+# getting location of software_name 
+SHARED_PATH=$(dirname ${SCRIPT_PATH})
+
+if [[ "$infile" != /* ]]; then
+	infile=$PWD/../${infile}
+	wc -l $infile
+fi
+
+line_num=$((${SLURM_ARRAY_TASK_ID}+1))
+line=`sed "${line_num}q;d" $infile`
+
+read name fasta gff3 <<< $line
+
+if [[ $fasta == *.gz ]]; then
+	gunzip -c $fasta > ${name}.unzipped_fasta
+	fasta=${name}.unzipped_fasta
+fi
+
+if [[ $gff3 == *.gz ]]; then
+	gunzip -c $gff3 > ${name}.gff3
+	gff3=${name}.gff3
+fi
+
+if [[ $gff3 == *.gff ]]; then
+	gffread $gff3 -o ${name}.gff3
+	gff3=${name}.gff3
+fi
+
+echo Name = $name
+echo FASTA = $fasta
+echo GFF3 = $gff3
+echo SHARED_PATH = ${SHARED_PATH}
+
+gene_gff=${name}_genes.gff3
+head -n 2 $gff3 > ${gene_gff}
+#grep "\sgene\s" $gff3 | sort | uniq >> ${gene_gff}
+grep "\sCDS\s" $gff3 | sort | uniq >> ${gene_gff}
+out=${name}.fasta
+${SHARED_PATH}/bedtools.static getfasta -fi $fasta -bed ${gene_gff} -name | sed "s/^>/>${name}_/g" | ${SHARED_PATH}/seqkit rmdup -n > ${out}

@@ -1,0 +1,22 @@
+#!/bin/sh
+#SBATCH --job-name=mafft
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time 5:00:00
+
+if [ "$SLURM_ARRAY_TASK_ID" == "" ]; then
+        SLURM_ARRAY_TASK_ID=0
+fi
+
+export PATH=$PATH:/home/erkonin/.conda/envs/pipeline_env/bin
+#export PATH=$PATH:/home/erkonin/daily_notes/alignments/mafft/build/bin
+input_files=(seq.list.part.*)
+INPUT_FILE=${input_files[$SLURM_ARRAY_TASK_ID]}
+
+# To install, unpack tar file and then update paths
+# Instructions: https://mafft.cbrc.jp/alignment/software/installation_without_root.html
+# Version: MAFFT v7.505 (2022/Apr/10)
+
+while read input; do
+	mafft --auto --thread -1 ${input} > ${input}.aln && rm ${input}
+done < ${INPUT_FILE}

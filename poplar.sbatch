@@ -2,6 +2,7 @@
 #SBATCH --job-name=tree_from_annotation
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH -p QUEUE
 
 # Usage: sbatch ncbi_main.script <dataset_catalog.json> 
 

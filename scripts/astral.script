@@ -3,6 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --time=2:30:00
+#SBATCH -p QUEUE
 
 export PATH=$PATH:/home/erkonin/daily_notes/gene_trees/raxml/from_annotation/astralpro/ASTER-Linux/bin
 

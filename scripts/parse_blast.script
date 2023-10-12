@@ -2,6 +2,7 @@
 #SBATCH --job-name=parse_blast
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH -p QUEUE
 
 source /home/erkonin/biopython/bin/activate
 # check if script is started via SLURM or bash
@@ -23,4 +24,3 @@ time python -u ${SHARED_PATH}/parse_blast.py blast_results*.xml blast_
 # Remove first file, which typically has too many matches
 wc -l blast_0.seq_list
 rm blast_0.seq_list
-

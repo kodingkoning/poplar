@@ -2,6 +2,7 @@
 #SBATCH --job-name=group
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH -p QUEUE
 
 module load python/3.10.8
 source ~/biopython/bin/activate

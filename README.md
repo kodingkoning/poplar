@@ -30,6 +30,8 @@ The "accession" field in the JSON file will be used for naming intermediate file
 
 ### Running the Pipeline
 
+Setup by running `./setup.sh <queue name>`. This will allow you to select the name of the Slurm queue that should be used by all jobs.
+
 On a machine using Slurm, run `sbatch poplar.sbatch /path/to/dataset_catalog.json`.
 
 ## Output

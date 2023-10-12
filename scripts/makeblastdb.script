@@ -2,6 +2,7 @@
 #SBATCH --job-name=makedb
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH -p QUEUE
 
 # Use BLAST+ version 2.14
 # Install from: https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/

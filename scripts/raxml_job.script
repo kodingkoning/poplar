@@ -2,6 +2,7 @@
 #SBATCH --job-name=raxml
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
+#SBATCH -p QUEUE
 
 export PATH=$PATH:/home/erkonin/daily_notes/raxml-ng/build/bin:/home/erkonin/daily_notes/gene_trees
 

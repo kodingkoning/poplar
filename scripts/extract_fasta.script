@@ -3,6 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH -p QUEUE
+#SBATCH -t 2:00:00
 
 infile=$1
 

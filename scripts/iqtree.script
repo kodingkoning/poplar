@@ -3,6 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH -p QUEUE
+#SBATCH -t 2:00:00
 
 source /home/erkonin/daily_notes/alignments/Cactus/cactus-bin-v2.6.0/cactus_env/bin/activate
 export PATH=$PATH:/home/erkonin/daily_notes/gene_trees/iqtree

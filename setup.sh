@@ -1,10 +1,19 @@
 #!/bin/bash
 
-if [ -z $1 ]; then
-    echo "First argument must be Slurm queue name"
-    exit
-fi
+usage() { echo "USAGE: -q to set queue name and -t to sex max time for a single job"; exit; }
 
-QUEUE=$1
+while getopts ":q:t:h:" o; do
+    case "${o}" in 
+        q)
+            QUEUE=${OPTARG}
+            sed -i "s/#SBATCH -p[^#]*/#SBATCH -p ${QUEUE}/" poplar.sbatch scripts/*.script
+            ;;
+        t)
+            TIME=${OPTARG}
+            sed -i "s/#SBATCH --time[^#]*/#SBATCH --time=${TIME}/" poplar.sbatch scripts/*.script
+            sed -i "s/#SBATCH -t[^#]*/#SBATCH -t ${TIME}/" poplar.sbatch scripts/*.script
+            ;;
+        h) usage;;
+    esac
+done
 
-sed -i "s/#SBATCH -p[^#]*/#SBATCH -p ${QUEUE}/" poplar.sbatch scripts/*.script

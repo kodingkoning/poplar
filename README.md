@@ -8,6 +8,7 @@ Popular is a software pipeline that uses an input of genes and assembled genomes
 
 Required dependencies:
 
+- [Python 3.10](https://www.python.org/downloads/)
 - [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)
 - [numpy](https://numpy.org/)
 - [sklearn 1.3.0](https://scikit-learn.org/stable/index.html)
@@ -54,8 +55,6 @@ Jobs spawn other jobs and then wait for their completition. If jobs are forced t
 
 There are currently not any checkpointing implemented. If the pipeline crashes, then the preceeding steps need to be rerun rather than continue from where it was left off. (TODO: add checkpointing)
 
-TODO: make a way to pick the time limits and queues for all of the scripts
-
-TODO: figure out why the full Kickxellomycotina set gets an error with one of the inputs (shows as "" query)
+TODO: figure out why the full Kickxellomycotina set gets an error with one of the inputs (shows as "" query) -- the file in genomes.txt doesn't exist, may have been a problem with the download or something like that, but may want to include a check that a file exists and pass a warning in that case
 
 TODO: add comments to code

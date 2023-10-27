@@ -3,6 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH -p QUEUE
+#SBATCH -t 2:00:00
 
 # Use BLAST+ version 2.14
 # Install from: https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/

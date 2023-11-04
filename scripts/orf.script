@@ -17,6 +17,8 @@ else
 fi
 
 SHARED_PATH=$(dirname ${SCRIPT_PATH})
+SHARED_PATH=(${SHARED_PATH})
+SHARED_PATH=${SHARED_PATH[0]}
 
 QUERY_FILE=$1
 infile=$2

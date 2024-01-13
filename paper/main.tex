@@ -1,0 +1,101 @@
+\documentclass[manuscript,screen,review,nonacm]{acmart}
+\usepackage[utf8]{inputenc}
+
+\title{Poplar: A Phylogenetics Pipeline}
+\author{Elizabeth Koning}
+\email{ekonin@sandia.gov}
+\orcid{0000-0001-9337-9870}
+\affiliation{
+    \institution{Sandia National Labratories}
+    \city{Livermore}
+    \state{CA}
+    \country{USA}
+    \postcode{94550}
+}
+\date{October 2023}
+
+\begin{abstract}
+    TODO: write the abstract
+\end{abstract}
+
+\begin{document}
+
+\maketitle
+
+\section{Background}
+
+Poplar is a software tool for the pipeline from assembled genome to phylogenetic tree. As a tree speices, "poplar" connects the concept of biological trees with the phylogenetic trees the software infers. Specifically, poplar trees have a reputation for fast growth, and Poplar, the software tool, is designed to quickly grow a phylogenetic tree.
+
+Creating phylogenetic trees from sequenced genomes is core to many research goals [TODO: find examples, elaborate]
+
+To obtain a species tree from a collection of assembled genomes requires a variety of software packages. While each step in the pipeline has well established and ever improving tools, those tools have unique file formats and input requirements that are frequently incompatible with other tools. Many steps have entirely independent computation, but executing in parallel requires manually initiating parallel jobs. Poplar addresses these concerns and manages converting file types, renaming sequences, and running tasks in parallel.
+
+The key steps are:
+
+\begin{enumerate}
+    \item Identify gene sequences
+    \item Group sequences into gene clusters
+    \item Align gene sequences
+    \item Create gene trees
+    \item Merge gene trees into species tree
+\end{enumerate}
+
+One approach to phylogenetic tree inference is distance-based methods, with many using k-mers. Though these methods are quick and often do not even require assembling the reads into scaffold sequences, we found that they have very poor accuracy. [TODO: see if other papers found the same thing] [TODO: list the examples we analyzed]
+
+One new software tool for tree inference is Read2Tree \cite{read2tree}. [TODO: talk about its accuracy] While the authors of Read2Tree report highly accurate output trees, Read2Tree requires an internet connection during its run as well as a download from the author's Orthologous Matrix (OMA) database before running. For some applications, the required remote connection would be a security concern. As for the data required from the external database, the database does not include sequences for all species. While we have not done a comprehensive examination of the included species, in our comparative testing, we found OMA includes very few fungal sequences.
+
+
+\section{Implementation}
+
+The new code in Poplar is mainly bash and Python scripts required to change file formats and label sequences. The lack of new algorithms is the strength of Poplar. Because it does not innovate new ways of generating gene trees or species trees, the end result when using Poplar is the same as when using RAxML or ASTRAL-Pro. When new software is introduced, Poplar can also be updated to use the most accurate algorithms. The accuracy is that of its component tools, and has the same theoretical and applied accuracy as its components.
+
+The first step in Poplar is identifying gene sequences for each input species. For some species, these will be input as sequences, and for others, the sequences must be extracted from the genome scaffold sequences. For those with genome input, Poplar uses [TODO: cite] orfipy to identify all ORFs. It removes the shortest ORFs, as those are the most likely to have false matches in the later grouping step.
+
+Following the identification of genes and ORFs, Poplar groups the sequences in clusters. To do this, it uses BLAST and DBSCAN. All the sequences are collected in a Nucleotide BLAST database. Poplar then queries the database for each sequence. The default similarity threshold is an expectation value (evalue) of $1^{-20}$, but this threshold may be increased or decreased by the user if the input organisms are less or more closely related, respectively. The evalues are then used in a distance matrix for the DBSCAN clustering algorithm to separate the sequences into groups. DBSCAN was selected for this step because it does not force a fixed number of groups, a fixed size of groups, or all sequences to be placed into a group. Instead, it identifies dense clusters as sequences that it declares groups. The identifies groups can then be used for gene trees.
+
+Once Poplar has a set of gene trees, 
+
+
+
+\section{Results}
+
+In our results, we report recall, but not precision. Due to the nature of the tree comparisons, we found recall to be far more useful than precision. The reference trees are obtained from NCBI's classification [TODO: see if we had other true tree sources], which does not provide fully resolved trees. Poplar and the other tree inference tools compared [TODO: make sure there are no exceptions] always report fully resolved trees. In comparing fully resolved binary trees to those that are not fully resolved, the precision can never be 100\%. This does not mean that the splits at the ends of the branches are necessarily incorrect, only that we do not have a reference to assess their accuracy.
+
+TODO: compare to NCBI, compare to Read2Tree, compare to distance methods
+
+TODO: run tests
+
+Test plan:
+
+\begin{enumerate}
+    \item All Pleurotus
+    \item All Kickxellomycotina
+    \item Pick some random Fungi
+    \item Pick some random species that are not even all in the same major category
+    \item Pick some backteria with well established relationships
+    \item Use a simulated dataset if possible
+    \item Check what Tandy or others use
+\end{enumerate}
+
+\section{Discussion}
+
+\section{Conclusions}
+
+\section{Availability and requirements}
+
+\begin{itemize}
+    \item Project name: Poplar
+    \item Project home page: [TODO: make public GitHub]
+    \item Operating system(s): Linux
+    \item Other requirements: Slurm, Python ($\geq$ 3.10), Anaconda (TODO: check version), Numpy (TODO: check version), scikit-learn ($\geq$ 1.3), biopython, seqkit, orfipy [TODO: check for others, list in alphabetic order]
+    \item License: GNU GPL-v3
+    \item Any restrictions to use by non-academics: None
+\end{itemize}
+
+% TODO: make sure all acronyms are defined at first use
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{citations}
+
+
+\end{document}

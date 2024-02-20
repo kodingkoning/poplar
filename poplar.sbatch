@@ -6,6 +6,8 @@
 
 # Usage: sbatch ncbi_main.script <dataset_catalog.json> 
 
+SECONDS=0
+
 if [ -z "$1" ]; then
     echo Error: input file name is required
     exit 1
@@ -92,3 +94,5 @@ echo "Running RAxML in job" $RAXML_JSD_ID
 ASTRAL_JSD_ID=$(sbatch -d afterok:$RAXML_JSD_ID --parsable ${SHARED_PATH}/astral.script $output)
 echo "Running ASTRAL-Pro in job" $ASTRAL_JSD_ID
 # TODO: test and confirm we get a tree and everything is used properly
+
+echo Elapsed Time: $SECONDS seconds

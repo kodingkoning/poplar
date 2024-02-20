@@ -5,6 +5,7 @@
 #SBATCH --time 6:00:00
 #SBATCH -p QUEUE
 
+SECONDS=0
 # check if script is started via SLURM or bash
 # if with SLURM: there variable '$SLURM_JOB_ID' will exist
 # `if [ -n $SLURM_JOB_ID ]` checks if $SLURM_JOB_ID is not an empty string
@@ -56,3 +57,4 @@ sbatch --array=1-${PARTS} -N1 --parsable --wait ${SHARED_PATH}/select_seq_job.sc
 chmod +x ${SHARED_PATH}/select_seq_job.script
 #${SHARED_PATH}/select_seq_job.script # For executing job 0
 wait
+echo Elapsed Time: $SECONDS seconds

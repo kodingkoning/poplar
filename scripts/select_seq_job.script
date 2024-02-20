@@ -5,6 +5,7 @@
 #SBATCH -p QUEUE
 #SBATCH -t 2:00:00
 
+SECONDS=0
 export PATH=$PATH:/home/erkonin/daily_notes/raxml-ng/build/bin:/home/erkonin/daily_notes/gene_trees
 if [ "$SLURM_ARRAY_TASK_ID" == "" ]; then
         SLURM_ARRAY_TASK_ID=0
@@ -19,3 +20,4 @@ while read input; do
         search_list=$(grep -f ${input} -l *.fasta)
 	seqkit grep -f ${input} -o ${input}.fasta ${search_list} && rm ${input}
 done < ${INPUT_FILE}
+echo Elapsed Time: $SECONDS seconds

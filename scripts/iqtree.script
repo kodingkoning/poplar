@@ -5,6 +5,7 @@
 #SBATCH -p QUEUE
 #SBATCH -t 2:00:00
 
+SECONDS=0
 source /home/erkonin/daily_notes/alignments/Cactus/cactus-bin-v2.6.0/cactus_env/bin/activate
 export PATH=$PATH:/home/erkonin/daily_notes/gene_trees/iqtree
 if [ -z "$1" ]; then
@@ -22,3 +23,4 @@ WORKING_DIR=job_${SLURM_JOB_ID}
 # mkdir $WORKING_DIR
 cactus-hal2maf ./$WORKING_DIR $input_file $input_file.maf --chunkSize 1000000 --refGenome N_crassa
 iqtree -s $input_file.maf -st maf -T AUTO
+echo Elapsed Time: $SECONDS seconds

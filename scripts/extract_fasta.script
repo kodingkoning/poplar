@@ -5,6 +5,7 @@
 #SBATCH -p QUEUE
 #SBATCH -t 2:00:00
 
+SECONDS=0
 infile=$1
 
 if [ -z "$1" ]; then
@@ -67,3 +68,4 @@ head -n 2 $gff3 > ${gene_gff}
 grep "\sCDS\s" $gff3 | sort | uniq >> ${gene_gff}
 out=${name}.fasta
 ${SHARED_PATH}/bedtools.static getfasta -fi $fasta -bed ${gene_gff} -name | sed "s/^>/>${name}_/g" | ${SHARED_PATH}/seqkit rmdup -n > ${out}
+echo Elapsed Time: $SECONDS seconds

@@ -5,6 +5,7 @@
 #SBATCH --time 5:00:00
 #SBATCH -p QUEUE
 
+SECONDS=0
 if [ "$SLURM_ARRAY_TASK_ID" == "" ]; then
         SLURM_ARRAY_TASK_ID=0
 fi
@@ -21,3 +22,4 @@ INPUT_FILE=${input_files[$SLURM_ARRAY_TASK_ID]}
 while read input; do
 	mafft --auto --thread -1 ${input} > ${input}.aln && rm ${input}
 done < ${INPUT_FILE}
+echo Elapsed Time: $SECONDS seconds

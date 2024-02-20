@@ -5,6 +5,7 @@
 #SBATCH -p QUEUE
 #SBATCH -t 2:00:00
 
+SECONDS=0
 cat *.tab > blast_results.csv
 
 if [ -n $SLURM_JOB_ID ];  then
@@ -19,3 +20,4 @@ fi
 SHARED_PATH=$(dirname ${SCRIPT_PATH})
 
 time python ${SHARED_PATH}/group.py 
+echo Elapsed Time: $SECONDS seconds

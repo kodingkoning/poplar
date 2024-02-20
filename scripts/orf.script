@@ -5,6 +5,7 @@
 #SBATCH -p QUEUE
 #SBATCH -t 2:00:00
 
+SECONDS=0
 # check if script is started via SLURM or bash
 # if with SLURM: there variable '$SLURM_JOB_ID' will exist
 # `if [ -n $SLURM_JOB_ID ]` checks if $SLURM_JOB_ID is not an empty string
@@ -40,3 +41,4 @@ orfipy --dna ${ORF_OUT_FILE} --ignore-case --outdir $PWD --min 1000 ${SUBJECT_FI
 cat ${ORF_OUT_FILE} | ${SHARED_PATH}/seqkit replace --f-by-name -p '.*' -r "${name}_gene{nr}" > ${OUT_FILE}
 rm ${ORF_OUT_FILE}
 echo "Completed orf.script"
+echo Elapsed Time: $SECONDS seconds

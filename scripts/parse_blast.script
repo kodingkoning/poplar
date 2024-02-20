@@ -5,6 +5,7 @@
 #SBATCH -p QUEUE
 #SBATCH -t 2:00:00
 
+SECONDS=0
 source /home/erkonin/biopython/bin/activate
 # check if script is started via SLURM or bash
 # if with SLURM: there variable '$SLURM_JOB_ID' will exist
@@ -25,3 +26,4 @@ time python -u ${SHARED_PATH}/parse_blast.py blast_results*.xml blast_
 # Remove first file, which typically has too many matches
 wc -l blast_0.seq_list
 rm blast_0.seq_list
+echo Elapsed Time: $SECONDS seconds

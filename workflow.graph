@@ -1,0 +1,28 @@
+digraph workflow {
+    N [label="N species with genes"]
+    M [label="M species with genomes"]
+    Catalog [label="Database Catalog"]
+    Parse [label="Parse Catalog"]
+    Relabel [label="Relabel Genes (N tasks)"]
+    Build_BLAST [label="Build BLAST Database"]
+    Find_ORF [label="Find ORFs in Genomes (M tasks)"]
+    Search [label="Search BLAST Database for Matches (N+M tasks)"]
+    Group [label="Group Sequences using DBSCAN"]
+    Select [label="Select Genes (X tasks)"] # TODO: describe better
+    Align [label="Multiple Sequence Alignment (X tasks)"]
+    Tree [label="Create Gene Trees (X tasks)"]
+    Species_Tree [label="Create Species Tree"]
+    N -> Catalog
+    M -> Catalog
+    Catalog -> Parse
+    Parse -> Relabel
+    Parse -> Find_ORF
+    Relabel -> Build_BLAST
+    Find_ORF -> Build_BLAST
+    Build_BLAST -> Search
+    Search -> Group
+    Group -> Select
+    Select -> Align
+    Align -> Tree
+    Tree -> Species_Tree
+}

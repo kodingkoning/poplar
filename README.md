@@ -9,6 +9,7 @@ Popular is a software pipeline that uses an input of genes and assembled genomes
 Required dependencies:
 
 - [Python 3.10](https://www.python.org/downloads/)
+- [Parsl](https://parsl.readthedocs.io/en/stable)
 - [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)
 - [numpy](https://numpy.org/)
 - [sklearn 1.3.0](https://scikit-learn.org/stable/index.html)
@@ -18,7 +19,7 @@ Required dependencies:
 Recommended installation:
 
 ```
-conda create -n poplar_env python=3.10 numpy scikit-learn biopython
+conda create -n poplar_env python=3.10 numpy scikit-learn biopython parsl
 conda activate poplar_env
 ```
 

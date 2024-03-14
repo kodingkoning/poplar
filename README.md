@@ -15,15 +15,32 @@ Required dependencies:
 - [sklearn 1.3.0](https://scikit-learn.org/stable/index.html)
 - [biopython](https://biopython.org/docs/1.75/api/Bio.html)
 - [orfipy](https://pypi.org/project/orfipy/)
+- [BLAST](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
+- [MAFFT](https://mafft.cbrc.jp/alignment/software/)
+- [RAxML-NG](https://github.com/amkozlov/raxml-ng)
+- [ASTRAL-Pro](https://github.com/chaoszhang/A-pro)
 
-Recommended installation:
+Recommended installation in a conda environment:
 
 ```
 conda create -n poplar_env python=3.10 numpy scikit-learn biopython parsl
 conda activate poplar_env
 ```
 
-Run the pipeline with the environment activated.
+Tools to install and add to PATH in `config.py`:
+
+- [BLAST](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
+- [orfipy](https://pypi.org/project/orfipy/)
+- [MAFFT](https://mafft.cbrc.jp/alignment/software/)
+- [RAxML-NG](https://github.com/amkozlov/raxml-ng)
+- [ASTRAL-Pro](https://github.com/chaoszhang/A-pro)
+
+Example `worker_init` value within config:
+
+```
+worker_init='conda activate poplar_env; export PATH=$PATH:$BLAST_PATH:$ORFIPY_PATH:$MAFFT_PATH:$RAXML_NG_PATH:$ASTRAL_PRO_PATH'
+```
+
 
 ## Setup
 

@@ -4,4 +4,5 @@
 #SBATCH --ntasks=1
 #SBATCH -p compute
 
+source activate ~/.conda/envs/poplar_env
 python ../parsl/main.py /home/erkonin/daily_notes/data/Kickxellomycotina/ncbi_dataset/data/dataset_catalog_abridged.json test.out

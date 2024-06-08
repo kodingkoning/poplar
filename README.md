@@ -19,28 +19,41 @@ Required dependencies:
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/)
 - [RAxML-NG](https://github.com/amkozlov/raxml-ng)
 - [ASTRAL-Pro](https://github.com/chaoszhang/A-pro)
+- [Java >= 1.7](https://www.java.com/en/download/), for ASTRAL-Pro
 
 Recommended installation in a conda environment:
 
 ```
-conda create -n poplar_env python=3.10 numpy scikit-learn biopython parsl
+conda create -n poplar_env python=3.10 numpy scikit-learn biopython parsl bioconda::orfipy mafft
 conda activate poplar_env
 ```
 
-Tools to install and add to PATH in `config.py`:
+Tools to download and add to PATH in `config.py`:
 
 - [BLAST](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
-- [orfipy](https://pypi.org/project/orfipy/)
-- [MAFFT](https://mafft.cbrc.jp/alignment/software/)
 - [RAxML-NG](https://github.com/amkozlov/raxml-ng)
 - [ASTRAL-Pro](https://github.com/chaoszhang/A-pro)
 
-Example `worker_init` value within config:
+All of these can be downloaded to the current director using "setup.sh". The locations will be printed for adding to config.py.
+
+## Parsl Configuration
+
+Parsl requires a configuration file with information required to launch the tasks. Information about the scope of options is available in Parsl's documentation, and the file in `parsl/config.py` offers a template to build on for poplar.
+
+The key things that need to be changed when moving to a new machine are:
+
+- conda environment activation
+- PATH for tools that are not installed with conda
+- partition name
+- nodes per block, maximum blocks, walltime
+
+Example `worker_init` value within config, in order to activate the conda environment and set PATH:
 
 ```
-worker_init='conda activate poplar_env; export PATH=$PATH:$BLAST_PATH:$ORFIPY_PATH:$MAFFT_PATH:$RAXML_NG_PATH:$ASTRAL_PRO_PATH'
+worker_init='conda activate poplar_env; export PATH=$PATH:$BLAST_PATH:$RAXML_NG_PATH:$ASTRAL_PRO_PATH'
 ```
 
+Partition name must be set to the slurm partition that should be used, and the details of the slurm job (nodes per block, maximum blocks, walltime) should be chosen based on the machine and job being run.
 
 ## Setup
 
@@ -52,9 +65,15 @@ The pipeline accepts a JSON file matching the format of the `dataset_catalog.jso
 
 ### Downloading Data
 
-Visit [NCBI's Genome Datasets page](https://www.ncbi.nlm.nih.gov/datasets/genome) and search for the desired taxa. From there, check the boxes for the assemblies you are interested in. Click "Download" and "Download Package". Select "Genome sequences (FASTA)" and "Genomic coding sequences (FASTA)" and download your file. Unzip the file, and it will contain the relevant FASTA files and `dataset_catalog.json`.
+Visit [NCBI's Genome Datasets page](https://www.ncbi.nlm.nih.gov/datasets/genome) and search for the desired taxa. From there, check the boxes for the assemblies you are interested in. Click "Download" and "Download Package". Select "Genome sequences (FASTA)", "Genomic coding sequences (FASTA)", and "Annotation features (GFF)" and download your file. Unzip the file, and it will contain the relevant FASTA files and `dataset_catalog.json`.
 
-If you have additional data to include alongside NCBI genomes, add an entry in the file for each additional species. If you are not downloading data from NCBI, use `files/dataset_catalog.json` as a template for your input file. `filePath` should be relative to the location of `dataset_catalog.json`, and file types should be `CDS_NUCLEOTIDE_FASTA` for gene files and `GENOMIC_NUCLEOTIDE_FASTA` for assembled genomes.
+If you have additional data to include alongside NCBI genomes, add an entry in the file for each additional species. If you are not downloading data from NCBI, use `files/dataset_catalog.json` as a template for your input file. `filePath` should be relative to the location of `dataset_catalog.json`, and file types should be `CDS_NUCLEOTIDE_FASTA` for gene files, `GENOMIC_NUCLEOTIDE_FASTA` for assembled genomes, and `GFF3` for GFF annotation files.
+
+The order of preference for input file types is:
+
+1. `CDS_NUCLEOTIDE_FASTA`, using the sequences as genes
+2. `GFF3` and `GENOMIC_NUCLEOTIDE_FASTA`, extracting gene sequences based on GFF3 from the genomic sequences file
+3. `GENOMIC_NUCLEOTIDE_FASTA`, identifying ORFs to use as gene sequences
 
 The "accession" field in the JSON file will be used for naming intermediate files as well as the placement in the output tree, so the values must be unique for each entry. If downloaded from NCBI, they will be GenBank IDs.
 
@@ -75,10 +94,6 @@ This tool only works on Slurm machines.
 If certain pre-compiled executables (such as for seqkit) cannot run on the provided architecture, there will be errors. These can be resolved by replacing the executables in their current locations.
 
 Jobs spawn other jobs and then wait for their completition. If jobs are forced to wait in the queue beyond the time limit of the originating job, then the pipeline might crash.
-
-TODO: figure out why the full Kickxellomycotina set gets an error with one of the inputs (shows as "" query) -- the file in genomes.txt doesn't exist, may have been a problem with the download or something like that, but may want to include a check that a file exists and pass a warning in that case
-
-TODO: add comments to code
 
 ## Steps
 
@@ -107,3 +122,8 @@ TODO: add comments to code
 ### Instructions for Generating NCBI Tree
 
 The tests in our paper compare the trees generated by this pipeline to NCBI's taxonomy. Creating that tree requires downloading data from NCBI's website and through their command line tools. The provided script `reference_tree.sh` downloads data from NCBI and creates a Newick tree with the available information on the spcies. In order to use the script, visit [NCBI's Genome Browser](https://www.ncbi.nlm.nih.gov/datasets/genome) and search for the names or IDs of the species of interest. For our tests, we selected only the reference genomes. Then, download the table. This table includes the GenBank reference numbers. The first column of the table will be GenBank IDs, which will be used for searching NCBI's database for the taxonomy.
+
+## Planned Improvements
+
+- Checkpointing using Parsl
+- Analysis of optimal gene sequence group size. Currently is required to be between 4 and 99.

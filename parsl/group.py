@@ -94,7 +94,7 @@ def group(WORKING_DIR):
     group_fastas = []
     print("Writing groups to files")
     for label, group in groups.items():
-        if len(group) > 3 and len(group) < 100: # TODO: Select maximum group size carefully
+        if len(group) > 3 and len(group) < 100:
             filename = f"group{label}.seq_list"
             with open(filename, "w") as fout:
                 for g in group:

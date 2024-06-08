@@ -4,8 +4,8 @@ from parsl.providers import SlurmProvider
 from parsl.executors import HighThroughputExecutor
 from parsl.launchers import SrunLauncher
 
-""" This config assumes that it is used to launch parsl tasks from the login nodes
-of Sandia's Kahuna. Each job submitted to the scheduler will request 2 nodes for 10 minutes.
+"""
+This config is written for Sandia's Kahuna. Each block will be 2 nodes allocated for 2 hours 10 minutes.
 """
 config = Config(
      executors=[
@@ -17,7 +17,7 @@ config = Config(
                     partition='compute',  # partition
                     nodes_per_block=2,  # number of nodes
                     init_blocks=1,
-                    max_blocks=1,
+                    max_blocks=4,
                     scheduler_options='',
                     cmd_timeout=60,
                     walltime='02:10:00',

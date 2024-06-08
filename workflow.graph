@@ -8,7 +8,7 @@ digraph workflow {
     Find_ORF [label="Find ORFs in Genomes (M tasks)"]
     Search [label="Search BLAST Database for Matches (N+M tasks)"]
     Group [label="Group Sequences using DBSCAN"]
-    Select [label="Select Genes (X tasks)"] # TODO: describe better
+    Select [label="Select Genes (X tasks)"]
     Align [label="Multiple Sequence Alignment (X tasks)"]
     Tree [label="Create Gene Trees (X tasks)"]
     Species_Tree [label="Create Species Tree"]

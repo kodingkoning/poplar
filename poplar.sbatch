@@ -56,7 +56,7 @@ echo "done"
 
 # Relabel genes
 # iterate over files in genes.txt, taking first element of each line as a species name and the second the file of the genes
-# TODO: if this gets slow, parallelize
+# NOTE: if this gets slow, parallelize
 echo -n "Relabeling genes... "
 QUERY_GENES=query_genes.query_fasta
 while read name file; do
@@ -93,6 +93,5 @@ echo "Running RAxML in job" $RAXML_JSD_ID
 # Step 6: Run ASTRAL-Pro for species tree
 ASTRAL_JSD_ID=$(sbatch -d afterok:$RAXML_JSD_ID --parsable ${SHARED_PATH}/astral.script $output)
 echo "Running ASTRAL-Pro in job" $ASTRAL_JSD_ID
-# TODO: test and confirm we get a tree and everything is used properly
 
 echo Elapsed Time: $SECONDS seconds

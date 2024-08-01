@@ -4,9 +4,21 @@
 
 Popular is a software pipeline that uses an input of genes and assembled genomes and generates a phylogenetic tree from the input.
 
+## Quickstart
+
+Poplar brings together a collection of other tools and is designed to simplify the path from genome/gene data to species tree. This does mean that there are a large number of dependencies, and a configuration file that needs to be updated for the particular machine.
+
+- Install dependencies by running `setup.sh`
+- Select provider in `config.py`, if SlurmProvider, then:
+	- `partition`, partition name
+	- `walltime`, maximum time for Parsl blocks
+	- `nodes_per_block`, `init_blocks`, `max_blocks`, traits of [Parsl blocks](https://parsl.readthedocs.io/en/stable/userguide/execution.html)
+- Download Pleurotus sample data by running `datasets download genome taxon 5320 --include genome,gff3,cds && unzip ncbi_dataset.zip`
+- Update partition in `parsl.sh` and run
+
 ## Dependencies
 
-Required dependencies:
+### Required dependencies:
 
 - [Python 3.10](https://www.python.org/downloads/)
 - [Parsl](https://parsl.readthedocs.io/en/stable)
@@ -18,56 +30,50 @@ Required dependencies:
 - [BLAST](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/)
 - [RAxML-NG](https://github.com/amkozlov/raxml-ng)
-- [ASTRAL-Pro](https://github.com/chaoszhang/A-pro)
-- [Java >= 1.7](https://www.java.com/en/download/), for ASTRAL-Pro
-
-Recommended installation in a conda environment:
-
-```
-conda create -n poplar_env python=3.10 numpy scikit-learn biopython parsl bioconda::orfipy mafft
-conda activate poplar_env
-```
-
-Tools to download and add to PATH in `config.py`:
-
 - [BLAST](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
 - [RAxML-NG](https://github.com/amkozlov/raxml-ng)
-- [ASTRAL-Pro](https://github.com/chaoszhang/A-pro)
+- [ASTRAL-Pro3](https://github.com/chaoszhang/ASTER)
 
-All of these can be downloaded to the current director using "setup.sh". The locations will be printed for adding to config.py.
+#### Optional dependency:
+
+- [NCBI Command-line Tools](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/), for downloading NCBI data
+
+### Recommended installation
+
+The recommended process for Linux installation is running `setup.py`. This will create a conda environment with the tools that can be installed through conda, as well as download the tools that are not installed with conda (BLAST, RAxML-NG, ASTRAL-Pro). The files will be downloaded to the current directory, and the paths will be included in the worker initialization through `config.py`.
 
 ## Parsl Configuration
 
 Parsl requires a configuration file with information required to launch the tasks. Information about the scope of options is available in Parsl's documentation, and the file in `parsl/config.py` offers a template to build on for poplar.
 
+Parsl uses "block" structures, an abstraction the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/execution.html) defines as "the most basic unit of resources to be acquired from a provider." In the Slurm context, a block can be one or more nodes, and the number of blocks can change throughout the execution.
+
 The key things that need to be changed when moving to a new machine are:
 
-- conda environment activation
-- PATH for tools that are not installed with conda
-- partition name
-- nodes per block, maximum blocks, walltime
+- conda environment activation, in `worker_init`.
+- PATH for tools that are not installed with conda, in `worker_init`.
+- partition name for the slurm partition to be used, in provider `partition`.
+- nodes per block, maximum blocks, walltime, also within provider, based on the machine and the job being run.
 
-Example `worker_init` value within config, in order to activate the conda environment and set PATH:
-
-```
-worker_init='conda activate poplar_env; export PATH=$PATH:$BLAST_PATH:$RAXML_NG_PATH:$ASTRAL_PRO_PATH'
-```
-
-Partition name must be set to the slurm partition that should be used, and the details of the slurm job (nodes per block, maximum blocks, walltime) should be chosen based on the machine and job being run.
-
-## Setup
-
-Before running the pipeline, set the name of the queue and the time limit for the jobs as needed for your system. `setup.sh` accepts `-q` for the name of the slurm queue and `-t` for the time limit. If you want different time limits for different pipeline stages, that must be done manually.
+Parsl allows Poplar to be run on systems other than those with Slurm, and Parsl's documentation describes how to use other types of providers, including cloud and local execution. [Parsl Documentation](https://parsl.readthedocs.io/en/stable/userguide/execution.html) describes the variety of options.
 
 ## Input
 
 The pipeline accepts a JSON file matching the format of the `dataset_catalog.json` that comes with a download from NCBI's genome datasets. The JSON file specifies the relative locations of the file contianing FASTA files.
 
+### Example/Test Run
+
+Requires the NCBI Command-line Tools, which can be installed via conda with: `conda install -c conda-forge ncbi-datasets-cli`
+
+Download the Pleurotus dataset via: `datasets download genome taxon 5320 --include genome,gff3,cds`, and then unzip the downloaded `ncbi_dataset.zip`.
+
+To run, pass `dataset_catalog.json` into Poplar: `python parsl/main.py ncbi_dataset/data/dataset_catalog.json`
+
 ### Downloading Data
 
-Visit [NCBI's Genome Datasets page](https://www.ncbi.nlm.nih.gov/datasets/genome) and search for the desired taxa. From there, check the boxes for the assemblies you are interested in. Click "Download" and "Download Package". Select "Genome sequences (FASTA)", "Genomic coding sequences (FASTA)", and "Annotation features (GFF)" and download your file. Unzip the file, and it will contain the relevant FASTA files and `dataset_catalog.json`.
+Poplar uses NCBI's dataset catalog JSON file format as input, but your data does not need to come from NCBI. If you don't want to download data from NCBI, use `files/dataset_catalog.json` as a template for your input file. `filePath` should be relative to the location of `dataset_catalog.json`, and file types should be `CDS_NUCLEOTIDE_FASTA` for gene files, `GENOMIC_NUCLEOTIDE_FASTA` for assembled genomes, and `GFF3` for GFF annotation files.
 
-If you have additional data to include alongside NCBI genomes, add an entry in the file for each additional species. If you are not downloading data from NCBI, use `files/dataset_catalog.json` as a template for your input file. `filePath` should be relative to the location of `dataset_catalog.json`, and file types should be `CDS_NUCLEOTIDE_FASTA` for gene files, `GENOMIC_NUCLEOTIDE_FASTA` for assembled genomes, and `GFF3` for GFF annotation files.
+The "accession" field in the JSON file will be used for naming intermediate files as well as the placement in the output tree, so the values must be unique for each entry. If downloaded from NCBI, they will be GenBank IDs.
 
 The order of preference for input file types is:
 
@@ -75,13 +81,25 @@ The order of preference for input file types is:
 2. `GFF3` and `GENOMIC_NUCLEOTIDE_FASTA`, extracting gene sequences based on GFF3 from the genomic sequences file
 3. `GENOMIC_NUCLEOTIDE_FASTA`, identifying ORFs to use as gene sequences
 
-The "accession" field in the JSON file will be used for naming intermediate files as well as the placement in the output tree, so the values must be unique for each entry. If downloaded from NCBI, they will be GenBank IDs.
+#### Command-line Download
+
+Requires [NCBI Command-line Tools](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/), which can be installed with conda via `conda install -c conda-forge ncbi-datasets-cli`
+
+Use [NCBI's Taxonomy Browser](https://www.ncbi.nlm.nih.gov/Taxonomy/taxonomyhome.html) to find the ID for your desired organisms.
+
+If, for example, you are downloading Pleurotus data, the ID is `5320`, and the download command to download all three types of data usable by Poplar would be: `datasets download genome taxon 5320 --include genome,gff3,cds`
+
+The tool downloads a zip file, and after unzipping the JSON file should be in `ncbi_dataset/data/dataset_catalog.json`.
+
+#### Website Download
+
+Visit [NCBI's Genome Datasets page](https://www.ncbi.nlm.nih.gov/datasets/genome) and search for the desired taxa. From there, check the boxes for the assemblies you are interested in. Click "Download" and "Download Package". Select "Genome sequences (FASTA)", "Genomic coding sequences (FASTA)", and "Annotation features (GFF)" and download your file. Unzip the file, and it will contain the relevant data and `dataset_catalog.json`.
 
 ### Running the Pipeline
 
-Setup by running `./setup.sh <queue name>`. This will allow you to select the name of the Slurm queue that should be used by all jobs.
+After installing using `setup.sh` and updating `config.py`, change the header and input in `poplar.sbatch`. The partion name and time limit are machine dependent. The path to the JSON file also needs be included as an argument for the Python script.
 
-On a machine using Slurm, run `sbatch poplar.sbatch /path/to/dataset_catalog.json`.
+Options for Poplar are available in the help menu, by running `parsl/main.py -h`.
 
 ## Output
 
@@ -89,7 +107,7 @@ The pipeline will create a new directory within the current directory to store a
 
 ## Limitations
 
-This tool only works on Slurm machines.
+This tool works only on Linux/Unix machines due to dependencies. The provided scripts show running with Slurm Workload Manager, and users can adapt the Parsl configuration to work with other compatible managers.
 
 If certain pre-compiled executables (such as for seqkit) cannot run on the provided architecture, there will be errors. These can be resolved by replacing the executables in their current locations.
 
@@ -125,5 +143,6 @@ The tests in our paper compare the trees generated by this pipeline to NCBI's ta
 
 ## Planned Improvements
 
+- Update from ASTRAL-Pro to A-pro2
 - Checkpointing using Parsl
 - Analysis of optimal gene sequence group size. Currently is required to be between 4 and 99.

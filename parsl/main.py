@@ -199,13 +199,8 @@ def mafft(input: str):
     return f'''mafft --auto --thread -1 {input} > {input}.aln && rm {input}'''
 
 @bash_app
-def raxml(input: str):
-    # sed is used to remove illegal parts of gene names
-    return f'''sed -i 's/_gene:.*$//g' {input} && sed -i 's/_CDS:.*$//g' {input} && sed -i 's/_ORF:.*$//g' {input} && seqkit rmdup -n {input} > {input}.tmp && mv {input}.tmp {input} && raxml-ng --search1 --msa {input} --model GTR+G --prefix {input} && rm {input}'''
-
-@bash_app
 def seq_list_to_gene_tree(input: str, WORKING_DIR: str, SHARED_PATH: str):
-    return f'''search_list=$(grep -f {input} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input} -o {input}.fasta ${{search_list}} && rm {input} && mafft --auto --thread -1 {input}.fasta > {input}.aln && sed -i 's/_gene:.*$//g' {input}.aln && sed -i 's/_CDS:.*$//g' {input}.aln && sed -i 's/_ORF:.*$//g' {input}.aln && seqkit rmdup -n {input}.aln > {input}.tmp && mv {input}.tmp {input}.aln && raxml-ng --search1 --msa {input}.aln --model GTR+G --prefix {input} && rm {input}.aln'''
+    return f'''search_list=$(grep -f {input} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input} -o {input}.fasta ${{search_list}} && rm {input} && mafft --auto --thread -1 {input}.fasta > {input}.aln && sed -i 's/_gene:.*$//g' {input}.aln && sed -i 's/_CDS:.*$//g' {input}.aln && sed -i 's/_ORF:.*$//g' {input}.aln && {SHARED_PATH}/seqkit rmdup -n {input}.aln > {input}.tmp && mv {input}.tmp {input}.aln && raxml-ng --search1 --msa {input}.aln --model GTR+G --prefix {input} && rm {input}.aln'''
 
 @bash_app
 def astralpro(output: str):
@@ -302,7 +297,7 @@ print("Done")
 print("Searching BLAST DB for matching sequences")
 os.mkdir("blast_results")
 search_blast_future = []
-print(blast_search_files)
+#print(blast_search_files)
 for line in blast_search_files:
     search_blast_future.append(search_blast(line, WORKING_DIR, args.blast_evalue))
 for future in search_blast_future:

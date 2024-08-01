@@ -3,6 +3,8 @@ from parsl.config import Config
 from parsl.providers import SlurmProvider
 from parsl.executors import HighThroughputExecutor
 from parsl.launchers import SrunLauncher
+from parsl.monitoring.monitoring import MonitoringHub
+from parsl.addresses import address_by_hostname
 
 """
 This config is written for Sandia's Kahuna. Each block will be 2 nodes allocated for 2 hours 10 minutes.
@@ -22,7 +24,7 @@ config = Config(
                     cmd_timeout=60,
                     walltime='02:10:00',
                     launcher=SrunLauncher(),
-                    worker_init='conda activate parsl_py38; export PATH=$PATH:/home/erkonin/daily_notes/BLAST/ncbi-blast-2.14.1+/bin:/home/erkonin/.conda/envs/pipeline_env/bin:/home/erkonin/daily_notes/gene_trees/raxml/from_annotation/astralpro/ASTER-Linux/bin:/home/erkonin/daily_notes/raxml-ng/build/bin:/home/erkonin/daily_notes/gene_trees',  # requires conda environment with parsl
+                    worker_init='conda activate poplar_env; export PATH=$PATH:$BLAST:$RAXML:$ASTRAL',  # requires conda environment with parsl
                ),
           )
      ],

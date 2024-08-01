@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=tree_from_annotation
+#SBATCH --job-name=poplar
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH -p compute
 
-source activate ~/.conda/envs/poplar_env
-python ../parsl/main.py /home/erkonin/daily_notes/data/Kickxellomycotina/ncbi_dataset/data/dataset_catalog_abridged.json test.out
+conda activate poplar_env
+python parsl/main.py ncbi_dataset/data/dataset_catalog.json out.tree

@@ -214,10 +214,10 @@ def make_temp_dir():
 
 parser = argparse.ArgumentParser()
 parser.add_argument('input_file', help='path to input json file', type=str)
-parser.add_argument('output_file', help='path to output file', type=str)
-parser.add_argument('-t', '--max_trees', help='maximum gene trees', default=50, type=int, required=False)
-parser.add_argument('-g', '--max_group_size', help='maximum number of sequences permitted in a gene group', default=100, type=int, required=False)
-parser.add_argument('-e', '--blast_evalue', help='evalue used for blastn search in finding related gene sequences', default='1e-20', type=str, required=False)
+parser.add_argument('-o', '--output_file', help='path to output file (default:  %(default)s)', default="output.tree", type=str, required=False)
+parser.add_argument('-t', '--max_trees', help='maximum gene trees (default:  %(default)s)', default=50, type=int, required=False)
+parser.add_argument('-g', '--max_group_size', help='maximum number of sequences permitted in a gene group (default:  %(default)s)', default=100, type=int, required=False)
+parser.add_argument('-e', '--blast_evalue', help='evalue used for blastn search in finding related gene sequences (default:  %(default)s)', default='1e-20', type=str, required=False)
 args = parser.parse_args()
 
 catalog_file_name = os.path.abspath(args.input_file)

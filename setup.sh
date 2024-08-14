@@ -8,7 +8,8 @@ cd dependencies
 
 #conda env create -f ../poplar_env.yml
 # OR create with
-conda create -n poplar_env python=3.10 numpy scikit-learn biopython parsl bioconda::orfipy mafft
+conda config --add channels conda-forge
+conda create -n poplar_env python=3.10 numpy scikit-learn biopython parsl bioconda::orfipy mafft ncbi-datasets-cli
 conda activate poplar_env
 
 EXTEND_PATH=""

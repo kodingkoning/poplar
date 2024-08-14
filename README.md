@@ -1,22 +1,24 @@
 # Poplar
 
-## Purpose
+## Features
 
-Popular is a software pipeline that uses an input of genes and assembled genomes and generates a phylogenetic tree from the input.
+Popular is a software pipeline that uses an input of genes and assembled genomes and generates a phylogenetic tree from the input. It connects tools to identify genes within assembled genomes, group sequences to construct gene trees, and then infer a species tree based on the gene trees.
 
 ## Quickstart
 
+The script `setup.sh` installs the required dependencies. This requires `conda` to be already installed, and will create a conda environment `poplar_env`. It will also autopopulate `parsl/config.py` with the path to the dependencies.
+
+In order to configure Parsl, the parallelism manager, view `parsl/config.py` and check the `SlurmProvider` information. The partition name will be machine specific, so must be selected by the user. Default options are included for `walltime`, the maximum time for a Parsl block, and `nodes_per_block`, `init_blocks`, and `max_blocks`, traits of [Parsl blocks](https://parsl.readthedocs.io/en/stable/userguide/execution.html), and should be reviewed before running a job.
+
+Sample Pleurotus data can be downloaded by running `datasets download genome taxon  5320 --include genome,gff3,cds && unzip ncbi_dataset.zip`
+
+Finally, run `python parsl/main.py ncbi_dataset/data/dataset_catalog.json out.tree` or update the partition name in `parsl.sh` and submit to Slurm.
+
+## Installation and Dependencies
+
 Poplar brings together a collection of other tools and is designed to simplify the path from genome/gene data to species tree. This does mean that there are a large number of dependencies, and a configuration file that needs to be updated for the particular machine.
 
-- Install dependencies by running `setup.sh`, which requires conda and will create an environment `poplar_env` and autopopulate `parsl/config.py` with path to the dependencies
-- Select provider in `parsl/config.py`, if SlurmProvider, then:
-	- `partition`, partition name
-	- `walltime`, maximum time for Parsl blocks
-	- `nodes_per_block`, `init_blocks`, `max_blocks`, traits of [Parsl blocks](https://parsl.readthedocs.io/en/stable/userguide/execution.html)
-- Download Pleurotus sample data by running `datasets download genome taxon 5320 --include genome,gff3,cds && unzip ncbi_dataset.zip`
-- Update partition in `parsl.sh` and run
-
-## Dependencies
+The recommended process for Linux installation is running `setup.sh`, which requires conda. This will create a conda environment `poplar_env` with the tools that can be installed through conda, as well as download the tools that are not installed with conda (BLAST, RAxML-NG, ASTRAL-Pro). The files will be downloaded to the current directory, and the paths will be added in the worker initialization through `parsl/config.py`.
 
 ### Required dependencies:
 
@@ -34,36 +36,30 @@ Poplar brings together a collection of other tools and is designed to simplify t
 - [RAxML-NG](https://github.com/amkozlov/raxml-ng)
 - [ASTRAL-Pro3](https://github.com/chaoszhang/ASTER)
 
-#### Optional dependency:
+#### Optional for downloading NCBI data:
 
 - [NCBI Command-line Tools](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/), for downloading NCBI data
 
-### Recommended installation
-
-The recommended process for Linux installation is running `setup.sh`. This will create a conda environment `poplar_env` with the tools that can be installed through conda, as well as download the tools that are not installed with conda (BLAST, RAxML-NG, ASTRAL-Pro). The files will be downloaded to the current directory, and the paths will be added in the worker initialization through `parsl/config.py`.
-
 ## Parsl Configuration
 
-Parsl requires a configuration file with information required to launch the tasks. Information about the scope of options is available in Parsl's documentation, and the file in `parsl/config.py` offers a template to build on for poplar.
+Parsl is a Python package used to manage parallel tasks. It can manage multiple Slurm job allocations, as it does in Poplar, and oversees running parallel and sequential tasks in Poplar.
 
-Parsl uses "block" structures, an abstraction the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/execution.html) defines as "the most basic unit of resources to be acquired from a provider." In the Slurm context, a block can be one or more nodes, and the number of blocks can change throughout the execution.
+Parsl requires a configuration file with information required to launch the tasks. Information about the scope of options is available in Parsl's documentation, and the file in `parsl/config.py` offers a template to build on for Poplar. Parsl uses "block" structures, an abstraction the [Parsl documentation](https://parsl.readthedocs.io/en/stable/userguide/execution.html) defines as "the most basic unit of resources to be acquired from a provider." In the Slurm context, a block can be one or more nodes, and the number of blocks can change throughout the execution.
 
 The key things that need to be changed when moving to a new machine are:
 
-- conda environment activation, in `worker_init`.
-- PATH for tools that are not installed with conda, in `worker_init`.
-- partition name for the slurm partition to be used, in provider `partition`.
-- nodes per block, maximum blocks, walltime, also within provider, based on the machine and the job being run.
+- conda environment activation, in `worker_init` (automatically set with `setup.sh`)
+- PATH for tools that are not installed with conda, in `worker_init` (automatically set with `setup.sh`)
+- partition name for the slurm partition to be used, in provider `partition`
+- nodes per block, maximum blocks, walltime, also within provider, based on the machine and the job being run
 
 Parsl allows Poplar to be run on systems other than those with Slurm, and Parsl's documentation describes how to use other types of providers, including cloud and local execution. [Parsl Documentation](https://parsl.readthedocs.io/en/stable/userguide/execution.html) describes the variety of options.
 
 ## Input
 
-The pipeline accepts a JSON file matching the format of the `dataset_catalog.json` that comes with a download from NCBI's genome datasets. The JSON file specifies the relative locations of the file contianing FASTA files.
+The pipeline accepts a JSON file matching the format of the `dataset_catalog.json` that comes with a download from NCBI's genome datasets. The JSON file specifies the relative locations of the genome and gene data files.
 
 ### Example/Test Run
-
-Requires the NCBI Command-line Tools, which can be installed via conda with: `conda install -c conda-forge ncbi-datasets-cli`
 
 Download the Pleurotus dataset via: `datasets download genome taxon 5320 --include genome,gff3,cds`, and then unzip the downloaded `ncbi_dataset.zip`.
 

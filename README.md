@@ -8,8 +8,8 @@ Popular is a software pipeline that uses an input of genes and assembled genomes
 
 Poplar brings together a collection of other tools and is designed to simplify the path from genome/gene data to species tree. This does mean that there are a large number of dependencies, and a configuration file that needs to be updated for the particular machine.
 
-- Install dependencies by running `setup.sh`
-- Select provider in `config.py`, if SlurmProvider, then:
+- Install dependencies by running `setup.sh`, which requires conda and will create an environment `poplar_env` and autopopulate `parsl/config.py` with path to the dependencies
+- Select provider in `parsl/config.py`, if SlurmProvider, then:
 	- `partition`, partition name
 	- `walltime`, maximum time for Parsl blocks
 	- `nodes_per_block`, `init_blocks`, `max_blocks`, traits of [Parsl blocks](https://parsl.readthedocs.io/en/stable/userguide/execution.html)
@@ -40,7 +40,7 @@ Poplar brings together a collection of other tools and is designed to simplify t
 
 ### Recommended installation
 
-The recommended process for Linux installation is running `setup.py`. This will create a conda environment with the tools that can be installed through conda, as well as download the tools that are not installed with conda (BLAST, RAxML-NG, ASTRAL-Pro). The files will be downloaded to the current directory, and the paths will be included in the worker initialization through `config.py`.
+The recommended process for Linux installation is running `setup.sh`. This will create a conda environment `poplar_env` with the tools that can be installed through conda, as well as download the tools that are not installed with conda (BLAST, RAxML-NG, ASTRAL-Pro). The files will be downloaded to the current directory, and the paths will be added in the worker initialization through `parsl/config.py`.
 
 ## Parsl Configuration
 
@@ -97,7 +97,7 @@ Visit [NCBI's Genome Datasets page](https://www.ncbi.nlm.nih.gov/datasets/genome
 
 ### Running the Pipeline
 
-After installing using `setup.sh` and updating `config.py`, change the header and input in `poplar.sbatch`. The partion name and time limit are machine dependent. The path to the JSON file also needs be included as an argument for the Python script.
+After installing using `setup.sh` and updating `parsl/config.py`, change the header and input in `poplar.sh`. The partion name and time limit are machine dependent. The path to the JSON file also needs be included as an argument for the Python script.
 
 Options for Poplar are available in the help menu, by running `parsl/main.py -h`.
 

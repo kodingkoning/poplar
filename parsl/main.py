@@ -4,97 +4,150 @@ import argparse
 import os
 import glob
 from config import config
+from parsl.data_provider.files import File
 
 parsl.load(config)
 
-def query_genes_func():
-	pass
-
 # Throw error if file_path does not exist
 def check_file(file_path):
-	if not os.path.isfile(file_path):
-		raise argparse.ArgumentTypeError(f"File {file_path} does not exist")
+    if not os.path.isfile(file_path):
+        raise argparse.ArgumentTypeError(f"File {file_path} does not exist")
 
-# Get annotation sequences
-# iterate over file pairs in annotations.txt
+@python_app
+def combine_files(inputs=(), outputs=()):
+    with open(outputs[0], 'w') as fout:
+        for finname in inputs:
+            with open(finname) as fin:
+                fout.write(fin.read())
+    return outputs[0]
+
+# Get annotation sequences and iterate over file pairs in annotations.txt
 @bash_app
-def annotations(line: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, stdout=parsl.AUTO_LOGNAME):
+def annotations(line: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, outputs=()):
     import os
     os.chdir(WORKING_DIR)
     name, gff_file, fasta_file = line.split()
-    return f'''{SHARED_PATH}/bedtools.static getfasta -fi {fasta_file} -bed {gff_file} -name > {fasta_file}.genes && echo {fasta_file}.genes > genes.txt'''
+    return f'''{SHARED_PATH}/bedtools.static getfasta -fi {fasta_file} -bed {gff_file} -name > {fasta_file}.genes && echo {fasta_file}.genes > {outputs[0]}'''
 
-# Relabel genes
-# iterate over files in genes.txt, taking first element of each line as a species name and the second the file of the genes
+@join_app
+def start_annotations_func(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=()):
+    with open(inputs[0], 'r') as fin:
+        lines = fin.readlines()
+    annotation_files = []
+    annotations_future = []
+    for line in lines:
+        name, gff_file, fasta_file = line.split()
+        annotation_file = name + ".annotation"
+        annotations_future.append(annotations(line,  CATALOG_PATH, SHARED_PATH, WORKING_DIR, outputs=[annotation_file]))
+        output_files.append(annotations_future.outputs[0])
+    return combine_files(inputs=annotation_files, outputs=[outputs[0]])
+
+# Relabel genes and iterate over files in genes.txt, taking first element of each line as a species name and the second the file of the genes
 @bash_app
-def relabel_genes(line: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, stdout=parsl.AUTO_LOGNAME):
+def relabel_genes(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=()):
     import os
     os.chdir(WORKING_DIR)
-    name, file = line.split()
-    return f'''cat {CATALOG_PATH}/{file} | {SHARED_PATH}/seqkit replace --f-by-name -p '.*' -r "{name}_gene{{nr}}" > {name}.fasta && echo {name}.fasta'''
+    name = inputs[0]
+    input_file = inputs[1]
+    return f'''cat {CATALOG_PATH}/{input_file} | {SHARED_PATH}/seqkit replace --f-by-name -p '.*' -r "{name}_gene{{nr}}" > {outputs[0]}'''
+
+@join_app
+def start_relabel_genes(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=()):
+    with open(inputs[0], 'r') as fin:
+        lines = fin.readlines()
+    output_files = []
+    for line in lines:
+        name, input_file = line.split()
+        output_file = File(f"{WORKING_DIR}/{name}.fasta")
+        output_files.append((relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[name, input_file], outputs=[output_file]).outputs[0]))
+    return output_files
 
 @python_app
-def parse_catalog_func(filename, WORKING_DIR):
+def parse_catalog_func(filename, WORKING_DIR, outputs=()):
     import os
     import json
     os.chdir(WORKING_DIR)
     with open(filename) as f:
         data = json.load(f)
     assemblies = data["assemblies"]
-    with open("genes.txt","w") as genes_fout:
-        with open("genomes.txt","w") as genomes_fout:
-            with open("annotations.txt","w") as annotations_fout:
+    with open(outputs[0],"w") as genes_fout:
+        with open(outputs[1],"w") as genomes_fout:
+            with open(outputs[2],"w") as annotations_fout:
                 for assembly in assemblies:
                     if "accession" in assembly:
                         files = assembly["files"]
                         cds_found = False
-                        for file in files:
-                            if "fileType" in file and file["fileType"] == "CDS_NUCLEOTIDE_FASTA":
-                                genes_fout.write(assembly["accession"] + " " + file["filePath"] + "\n")
+                        for fi in files:
+                            if "fileType" in fi and fi["fileType"] == "CDS_NUCLEOTIDE_FASTA":
+                                genes_fout.write(assembly["accession"] + " " + fi["filePath"] + "\n")
                                 cds_found = True
                         if not cds_found:
-                            for file in files:
-                                if "fileType" in file and file["fileType"] == "GENOMIC_NUCLEOTIDE_FASTA":
+                            for fi in files:
+                                if "fileType" in fi and fi["fileType"] == "GENOMIC_NUCLEOTIDE_FASTA":
                                     gff_found = False
                                     for file2 in files:
-                                        if "fileType" in file2 and file["fileType"] == "GFF3":
-                                            annotations_fout.write(assembly["accession"] + " " + file2["filePath"] + " " + file["filePath"] + "\n")
+                                        if "fileType" in file2 and fi["fileType"] == "GFF3":
+                                            annotations_fout.write(assembly["accession"] + " " + file2["filePath"] + " " + fi["filePath"] + "\n")
                                             gff_found = True
                                     if not gff_found:
-                                        genomes_fout.write(assembly["accession"] + " " + file["filePath"] + "\n")
+                                        genomes_fout.write(assembly["accession"] + " " + fi["filePath"] + "\n")
     return True
 
 @bash_app
-def find_orfs(line: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, stdout=parsl.AUTO_LOGNAME):
+def find_orfs(name: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=()):
     import os
     os.chdir(WORKING_DIR)
-    name, file = line.split()
-    subject = f"{CATALOG_PATH}/{file}"
-    output = f"blast_{name}.fasta"
-    orf_output = f"orf_{name}.fasta"
+    subject = inputs[0]
+    output = outputs[0]
+    orf_output = f"{output}.tmporf"
     PWD = os.getcwd()
-    # install orfipy with: conda install bioconda::orfipy                                                                                                                                    
     return f'''orfipy --dna {orf_output} --ignore-case --outdir {PWD} --min 1000 {subject} && cat {orf_output} | {SHARED_PATH}/seqkit replace --f-by-name -p '.*' -r "{name}_gene{{nr}}" > {output} && rm {orf_output} && echo {output}'''
 
-@bash_app
-def build_blast_db(WORKING_DIR: str):
-	return f'''cd {WORKING_DIR} && rm -f genes.db* && cat *.fasta > all_species.all_fasta && makeblastdb -input_type fasta -in all_species.all_fasta -blastdb_version 5 -title "grouping genes" -dbtype nucl -out genes.db'''
+@join_app
+def start_find_orfs(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=()):
+    from parsl import bash_app
+    from parsl.data_provider.files import File
+    tasks = []
+    output_files = []
+    with open(inputs[0], 'r') as fin:
+        lines = fin.readlines()
+    for line in lines:
+        name, input_file = line.split()
+        output_file = File(f"{WORKING_DIR}/blast_{name}.fasta")
+        app = find_orfs(name, CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[File(f"{CATALOG_PATH}/{input_file}")], outputs=[output_file])
+        output_files.append(app.outputs[0])
+    return output_files
 
 @bash_app
-def search_blast(line: str, WORKING_DIR: str, blast_evalue: str):
+def build_blast_db(WORKING_DIR: str, inputs=(), outputs=()): # in: cat *.fasta > all_species.all_fasta, out: genes.db
+    return f'''cd {WORKING_DIR} && rm -f genes.db* && cat *.fasta > all_species.all_fasta && makeblastdb -input_type fasta -in all_species.all_fasta -blastdb_version 5 -title "grouping genes" -dbtype nucl -out {outputs[0]} && touch {outputs[0]}'''
+
+@bash_app
+def search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), outputs=()):
     import os
     os.chdir(WORKING_DIR)
-    line = line.strip()
-    name = line.split('.')[0]
-    filename = f"blast_{name}.fasta"
-    return f'''blastn -query {line} -db genes.db -out blast_results/{filename}.tab -task dc-megablast -evalue {blast_evalue} -outfmt "6 qaccver saccver evalue" -num_threads 2 && echo 0'''
+    query = inputs[0]
+    database = inputs[1]
+    outfile = outputs[0]
+    return f'''blastn -query {query} -db {database} -out {outfile} -task dc-megablast -evalue {blast_evalue} -outfmt "6 qaccver saccver evalue" -num_threads 2'''
+
+@join_app
+def start_search_blast(WORKING_DIR: str, blast_evalue: str, inputs=()):
+    database = inputs[0]
+    queries = inputs[1]
+    queries.extend(inputs[2])
+    output_files = []
+    for query in queries:
+        fileout = File(f"{query.filepath}.tab")
+        output_files.append(search_blast(WORKING_DIR, blast_evalue, inputs=[query, database], outputs=[fileout]).outputs[0])
+    return output_files
 
 @bash_app
-def copy_blast_to_csv(WORKING_DIR: str):
-    return f'''cd {WORKING_DIR} && cat blast_results/*.tab > blast_results.csv'''
+def copy_blast_to_csv(WORKING_DIR: str, inputs=(), outputs=()):
+    return f'''cd {WORKING_DIR} && cat {' '.join(f.filepath for f in inputs[0])} > {outputs[0]}'''
 
 @python_app
-def group(WORKING_DIR, max_group_size):
+def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
     import os
     os.chdir(WORKING_DIR)
     import csv
@@ -106,9 +159,10 @@ def group(WORKING_DIR, max_group_size):
     from sklearn.metrics import silhouette_score
     from sklearn.neighbors import sort_graph_by_row_values
     from collections import defaultdict
+    from parsl.data_provider.files import File
 
     # Define the path to your BLAST results file
-    blast_results_file = 'blast_results.csv'  # Replace with your file path
+    blast_results_file = inputs[0]  # Replace with your file path
 
     # Define the minimum number of clusters as 1/N (N specified via command line)
     # Replace N with the appropriate value or use a command-line argument parser
@@ -184,27 +238,52 @@ def group(WORKING_DIR, max_group_size):
         if labels[i] != 1:
             groups[labels[i]].append(index_to_sequence[i])
 
+    output_files = []
     for label, group in groups.items():
         if len(group) > 3 and len(group) < max_group_size:
-            with open(f"group{label}.seq_list", "w") as fout:
+            f = File(f"{WORKING_DIR}/group{label}.seq_list")
+            output_files.append(f)
+            with open(f, "w") as fout:
                 for g in group:
                     print(g, file=fout)
-                    
-@bash_app
-def select_group_seq(input: str, WORKING_DIR: str, SHARED_PATH: str):
-    return f'''search_list=$(grep -f {input} -l *.fasta) && {SHARED_PATH}/seqkit grep -f {input} -o {input}.fasta ${{search_list}} && rm {input}'''
-
+    with open(outputs[0], 'w') as fout:
+        for filename in output_files:
+            print(filename, file=fout)
+ 
 @bash_app
 def mafft(input: str):
     return f'''mafft --auto --thread -1 {input} > {input}.aln && rm {input}'''
 
 @bash_app
-def seq_list_to_gene_tree(input: str, WORKING_DIR: str, SHARED_PATH: str):
-    return f'''search_list=$(grep -f {input} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input} -o {input}.fasta ${{search_list}} && rm {input} && mafft --auto --thread -1 {input}.fasta > {input}.aln && sed -i 's/_gene:.*$//g' {input}.aln && sed -i 's/_CDS:.*$//g' {input}.aln && sed -i 's/_ORF:.*$//g' {input}.aln && {SHARED_PATH}/seqkit rmdup -n {input}.aln > {input}.tmp && mv {input}.tmp {input}.aln && raxml-ng --search1 --msa {input}.aln --model GTR+G --prefix {input} && rm {input}.aln'''
+def seq_list_to_gene_tree(WORKING_DIR: str, SHARED_PATH: str, inputs=(), outputs=()):
+    input_file = inputs[0].strip()
+    # TODO: correct the grep -l *.fasta path -- this is showing all files with matches with the queries from {input}
+    # This may also be referenced as 'all_species.all_fasta' -- which also has been using *.fasta, and should use actual paths
+    # Group output was just the names of the genes, and then it needs to use seqkit to grab the actual sequences from the fasta files
+    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && rm {input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {input_file}.aln && raxml-ng --search1 --msa {input_file}.aln --model GTR+G --prefix {input_file} && rm {input_file}.aln && echo {outputs[0]}'''
+
+@join_app
+def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, inputs=(), outputs=()):
+    import random
+    with open(inputs[0], 'r') as fin:
+        genes_for_trees = fin.readlines()
+    if len(genes_for_trees) > max_trees:
+        random.shuffle(genes_for_trees)
+        genes_for_trees = genes_for_trees[:max_trees]
+    tree_files = []
+    for gene_file in genes_for_trees:
+        tree_file = File(f"{gene_file}.raxml.bestTree")
+        tree_task = seq_list_to_gene_tree(WORKING_DIR, SHARED_PATH, inputs=[gene_file], outputs=[tree_file])
+        tree_files.append(tree_task.outputs[0])
+    with open(outputs[0], 'w') as fout:
+        for filename in tree_files:
+            print(filename.filepath, file=fout)
+    return tree_files
 
 @bash_app
-def astralpro(output: str):
-    return f'''cat *.bestTree > all_trees.out && sed -i 's/_gene[^:]*//g' all_trees.out && sed -i 's/_ORF[^:]*//g' all_trees.out && sed -i 's/_DN[^:]*//g' all_trees.out && astral-pro -i all_trees.out -o {output}'''
+def astralpro(inputs=(), outputs=()):
+    bestTrees = ' '.join(f.filepath for f in inputs)
+    return f'''cat {bestTrees} > all_trees.out && sed -i 's/_gene[^:]*//g' all_trees.out && sed -i 's/_ORF[^:]*//g' all_trees.out && sed -i 's/_DN[^:]*//g' all_trees.out && astral-pro -i all_trees.out -o {outputs[0]}'''
 
 @python_app
 def make_temp_dir():
@@ -236,101 +315,39 @@ WORKING_DIR = make_temp_dir().result()
 os.chdir(WORKING_DIR)
 print(WORKING_DIR)
 
-print("Parsing catalog...")
-parse_catalog_future = parse_catalog_func(catalog_file_name, WORKING_DIR)
-if not parse_catalog_future.result():
-    print("Error in parsing catalog")
-print("Done")
+gene_file = File(WORKING_DIR + "/genes.txt")
+genomes_file = File(WORKING_DIR + "/genomes.txt")
+annotations_file = File(WORKING_DIR + "/annotations.txt")
+annotation_genes_file = File(WORKING_DIR + "/annotation_genes.txt")
+relabeled_gene_file= File(WORKING_DIR + "/relabeled_genes.txt")
+query_genes_file = File(WORKING_DIR + "/query_genes.query_fasta")
+all_genes_file = File(WORKING_DIR + "/all_species.all_fasta")
+blast_db_file = File(WORKING_DIR + "/genes.db")
+blast_csv = File(WORKING_DIR + "/blast_results.csv")
+group_list_file = File(WORKING_DIR + "/grouplist.txt")
+gene_tree_list_file = File(WORKING_DIR + "/genetreelist.txt")
+output_tree_file = File(output_file_name)
 
-print("Finding sequences from annotations...")
-with open("annotations.txt") as fin:
-    lines = fin.readlines()
-annotations_future = []
-for line in lines:
-    annotations_future.append(annotations(line, CATALOG_PATH, SHARED_PATH, WORKING_DIR))
-for future in annotations_future:
-    if future.result() != 0:
-        print(f"Error in extracting sequences from annotation: {future.result()}")
-        exit()
-
-print("Relabeling genes...")
-QUERY_GENES="query_genes.query_fasta"
-with open("genes.txt") as fin:
-	lines = fin.readlines()
-relabel_genes_future = []
-for line in lines:
-	relabel_genes_future.append(relabel_genes(line, CATALOG_PATH, SHARED_PATH, WORKING_DIR))
-
+print("Parsing catalog")
+parse_catalog_future = parse_catalog_func(catalog_file_name, WORKING_DIR, outputs=[gene_file, genomes_file, annotations_file])
+print("Finding sequences from annotations")
+start_annotations = start_annotations_func(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[2]], outputs=[annotation_genes_file])
+combine_genes_and_annotations = combine_files(inputs=[parse_catalog_future.outputs[0], start_annotations.outputs[0]], outputs=[relabeled_gene_file])
+print("Relabeling genes")
+relabel_genes_future = start_relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR,inputs=[combine_genes_and_annotations.outputs[0]])
 print("Finding ORFs in unannotated genomes...")
-blast_search_files = []
-with open("genomes.txt") as fin:
-	lines = fin.readlines()
-find_orfs_future = []
-for line in lines:
-    find_orfs_future.append(find_orfs(line, CATALOG_PATH, SHARED_PATH, WORKING_DIR))
-for future in relabel_genes_future:
-    if future.result() != 0:
-        print(f"Error in relabeling genes: {future.result()}")
-        exit()
-    else:
-        with open(future.stdout) as f:
-            for line in f:
-                pass
-            blast_search_files.append(line.strip())
-for future in find_orfs_future:
-    if future.result() != 0:
-        print(f"Error in finding ORFs: {future.result()}")
-        exit()
-    else:
-        with open(future.stdout) as f:
-            for line in f:
-                pass
-            blast_search_files.append(line.strip())
-print("Done")
-
-print("Building BLAST DB of potential gene sequences")
-build_blast_db_future = build_blast_db(WORKING_DIR)
-if(build_blast_db_future.result() != 0):
-    print(f"Error in building BLAST DB: {build_blast_db_future.result()}")
-print("Done")
-
+find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file])
+print("Building BLAST Database")
+build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0]], outputs=[blast_db_file])
 print("Searching BLAST DB for matching sequences")
-os.mkdir("blast_results")
-search_blast_future = []
-#print(blast_search_files)
-for line in blast_search_files:
-    search_blast_future.append(search_blast(line, WORKING_DIR, args.blast_evalue))
-for future in search_blast_future:
-    if future.result() != 0:
-        print(f"Error in searching BLAST DB: {future.result()}")
-        exit()
-print("Done")
-
-copy_future = copy_blast_to_csv(WORKING_DIR)
-if copy_future.result() != 0:
-    print(f"Error in copying BLAST search results to csv file")
-
+blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future, find_orfs_future])
+copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
 print("Grouping the sequences")
-grouping_future = group(WORKING_DIR, args.max_group_size)
-if grouping_future.result() != 0:
-    print(f"Error in grouping sequences: {grouping_future.result()}")
-print("Done")
-
-print("Generate gene trees")
-gene_tree_futures = []
-count = 0
-for filename in glob.glob(WORKING_DIR+"/*.seq_list"):
-    count += 1
-    gene_tree_futures.append(seq_list_to_gene_tree(filename, WORKING_DIR, SHARED_PATH))
-    if count >= args.max_trees:
-        break
-for future in gene_tree_futures:
-    if future.result() != 0:
-        print(f"Error in generating gene trees: {future.result()}")
-print("Done")
-
+grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
+print("Generate gene trees") # TODO: fix how this step has printed the futures, not the paths
+gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[gene_tree_list_file])
 print("Generate species tree")
-species_tree_future = astralpro(output_file_name)
-if species_tree_future.result() != 0:
-    print("Error in ASTRAL-Pro")
-print("Done")
+species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
+#species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file])
+print(species_tree_future.result())
+

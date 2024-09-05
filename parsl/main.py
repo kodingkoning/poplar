@@ -6,8 +6,6 @@ import glob
 from config import config
 from parsl.data_provider.files import File
 
-parsl.load(config)
-
 # Throw error if file_path does not exist
 def check_file(file_path):
     if not os.path.isfile(file_path):
@@ -291,63 +289,65 @@ def make_temp_dir():
     import os
     return tempfile.mkdtemp(prefix=os.getcwd()+'/')
 
-parser = argparse.ArgumentParser()
-parser.add_argument('input_file', help='path to input json file', type=str)
-parser.add_argument('-o', '--output_file', help='path to output file (default:  %(default)s)', default="output.tree", type=str, required=False)
-parser.add_argument('-t', '--max_trees', help='maximum gene trees (default:  %(default)s)', default=50, type=int, required=False)
-parser.add_argument('-g', '--max_group_size', help='maximum number of sequences permitted in a gene group (default:  %(default)s)', default=100, type=int, required=False)
-parser.add_argument('-e', '--blast_evalue', help='evalue used for blastn search in finding related gene sequences (default:  %(default)s)', default='1e-20', type=str, required=False)
-args = parser.parse_args()
+with parsl.load(config):
 
-catalog_file_name = os.path.abspath(args.input_file)
-output_file_name = os.getcwd() + "/" + args.output_file
-if not float(args.blast_evalue) < 1:
-    print(f"Error: blast_evalue must be a number less than 1")
-    exit
-check_file(args.input_file)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_file', help='path to input json file', type=str)
+    parser.add_argument('-o', '--output_file', help='path to output file (default:  %(default)s)', default="output.tree", type=str, required=False)
+    parser.add_argument('-t', '--max_trees', help='maximum gene trees (default:  %(default)s)', default=50, type=int, required=False)
+    parser.add_argument('-g', '--max_group_size', help='maximum number of sequences permitted in a gene group (default:  %(default)s)', default=100, type=int, required=False)
+    parser.add_argument('-e', '--blast_evalue', help='evalue used for blastn search in finding related gene sequences (default:  %(default)s)', default='1e-20', type=str, required=False)
+    args = parser.parse_args()
 
-print(f"Input file: {catalog_file_name}")
-print(f"Output file: {output_file_name}")
+    catalog_file_name = os.path.abspath(args.input_file)
+    output_file_name = os.getcwd() + "/" + args.output_file
+    if not float(args.blast_evalue) < 1:
+        print(f"Error: blast_evalue must be a number less than 1")
+        exit()
+    check_file(args.input_file)
 
-CATALOG_PATH = os.path.dirname(catalog_file_name)
-SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
-WORKING_DIR = make_temp_dir().result()
-os.chdir(WORKING_DIR)
-print(WORKING_DIR)
+    print(f"Input file: {catalog_file_name}")
+    print(f"Output file: {output_file_name}")
 
-gene_file = File(WORKING_DIR + "/genes.txt")
-genomes_file = File(WORKING_DIR + "/genomes.txt")
-annotations_file = File(WORKING_DIR + "/annotations.txt")
-annotation_genes_file = File(WORKING_DIR + "/annotation_genes.txt")
-relabeled_gene_file= File(WORKING_DIR + "/relabeled_genes.txt")
-query_genes_file = File(WORKING_DIR + "/query_genes.query_fasta")
-all_genes_file = File(WORKING_DIR + "/all_species.all_fasta")
-blast_db_file = File(WORKING_DIR + "/genes.db")
-blast_csv = File(WORKING_DIR + "/blast_results.csv")
-group_list_file = File(WORKING_DIR + "/grouplist.txt")
-gene_tree_list_file = File(WORKING_DIR + "/genetreelist.txt")
-output_tree_file = File(output_file_name)
+    CATALOG_PATH = os.path.dirname(catalog_file_name)
+    SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
+    WORKING_DIR = make_temp_dir().result()
+    os.chdir(WORKING_DIR)
+    print(WORKING_DIR)
 
-print("Parsing catalog")
-parse_catalog_future = parse_catalog_func(catalog_file_name, WORKING_DIR, outputs=[gene_file, genomes_file, annotations_file])
-print("Finding sequences from annotations")
-start_annotations = start_annotations_func(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[2]], outputs=[annotation_genes_file])
-combine_genes_and_annotations = combine_files(inputs=[parse_catalog_future.outputs[0], start_annotations.outputs[0]], outputs=[relabeled_gene_file])
-print("Relabeling genes")
-relabel_genes_future = start_relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR,inputs=[combine_genes_and_annotations.outputs[0]])
-print("Finding ORFs in unannotated genomes...")
-find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file])
-print("Building BLAST Database")
-build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0]], outputs=[blast_db_file])
-print("Searching BLAST DB for matching sequences")
-blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future, find_orfs_future])
-copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
-print("Grouping the sequences")
-grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
-print("Generate gene trees") # TODO: fix how this step has printed the futures, not the paths
-gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[gene_tree_list_file])
-print("Generate species tree")
-species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
-#species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file])
-print(species_tree_future.result())
+    gene_file = File(WORKING_DIR + "/genes.txt")
+    genomes_file = File(WORKING_DIR + "/genomes.txt")
+    annotations_file = File(WORKING_DIR + "/annotations.txt")
+    annotation_genes_file = File(WORKING_DIR + "/annotation_genes.txt")
+    relabeled_gene_file= File(WORKING_DIR + "/relabeled_genes.txt")
+    query_genes_file = File(WORKING_DIR + "/query_genes.query_fasta")
+    all_genes_file = File(WORKING_DIR + "/all_species.all_fasta")
+    blast_db_file = File(WORKING_DIR + "/genes.db")
+    blast_csv = File(WORKING_DIR + "/blast_results.csv")
+    group_list_file = File(WORKING_DIR + "/grouplist.txt")
+    gene_tree_list_file = File(WORKING_DIR + "/genetreelist.txt")
+    output_tree_file = File(output_file_name)
+
+    print("Parsing catalog")
+    parse_catalog_future = parse_catalog_func(catalog_file_name, WORKING_DIR, outputs=[gene_file, genomes_file, annotations_file])
+    print("Finding sequences from annotations")
+    start_annotations = start_annotations_func(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[2]], outputs=[annotation_genes_file])
+    combine_genes_and_annotations = combine_files(inputs=[parse_catalog_future.outputs[0], start_annotations.outputs[0]], outputs=[relabeled_gene_file])
+    print("Relabeling genes")
+    relabel_genes_future = start_relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR,inputs=[combine_genes_and_annotations.outputs[0]])
+    print("Finding ORFs in unannotated genomes...")
+    find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file])
+    print("Building BLAST Database")
+    build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0]], outputs=[blast_db_file])
+    print("Searching BLAST DB for matching sequences")
+    blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future, find_orfs_future])
+    copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
+    print("Grouping the sequences")
+    grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
+    print("Generate gene trees") # TODO: fix how this step has printed the futures, not the paths
+    gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[gene_tree_list_file])
+    print("Generate species tree")
+    species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
+    #species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file])
+    species_tree_future.result()
 

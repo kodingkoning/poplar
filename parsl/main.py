@@ -249,19 +249,21 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
             print(filename, file=fout)
  
 @bash_app
-def mafft(input: str):
-    return f'''mafft --auto --thread -1 {input} > {input}.aln && rm {input}'''
-
-@bash_app
-def seq_list_to_gene_tree(WORKING_DIR: str, SHARED_PATH: str, inputs=(), outputs=()):
+def seq_list_to_gene_tree(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
     input_file = inputs[0].strip()
     # TODO: correct the grep -l *.fasta path -- this is showing all files with matches with the queries from {input}
     # This may also be referenced as 'all_species.all_fasta' -- which also has been using *.fasta, and should use actual paths
     # Group output was just the names of the genes, and then it needs to use seqkit to grab the actual sequences from the fasta files
-    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && rm {input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {input_file}.aln && raxml-ng --search1 --msa {input_file}.aln --model GTR+G --prefix {input_file} && rm {input_file}.aln && echo {outputs[0]}'''
+    rm_input_file = ""
+    rm_aln = ""
+    if remove_files:
+        rm_input_file = f'rm {input_file}'
+        rm_aln = f'rm {input_file}.aln'
+    
+    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && {rm_input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {input_file}.aln && raxml-ng --search1 --msa {input_file}.aln --model GTR+G --prefix {input_file} && {rm_aln}'''
 
 @join_app
-def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, inputs=(), outputs=()):
+def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_files: bool, inputs=(), outputs=()):
     import random
     with open(inputs[0], 'r') as fin:
         genes_for_trees = fin.readlines()
@@ -271,7 +273,7 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, inputs=
     tree_files = []
     for gene_file in genes_for_trees:
         tree_file = File(f"{gene_file}.raxml.bestTree")
-        tree_task = seq_list_to_gene_tree(WORKING_DIR, SHARED_PATH, inputs=[gene_file], outputs=[tree_file])
+        tree_task = seq_list_to_gene_tree(WORKING_DIR, SHARED_PATH, remove_files, inputs=[gene_file], outputs=[tree_file])
         tree_files.append(tree_task.outputs[0])
     with open(outputs[0], 'w') as fout:
         for filename in tree_files:
@@ -287,7 +289,7 @@ def astralpro(inputs=(), outputs=()):
 def make_temp_dir():
     import tempfile
     import os
-    return tempfile.mkdtemp(prefix=os.getcwd()+'/')
+    return tempfile.mkdtemp(prefix=os.getcwd()+'/poplar_tmp_')
 
 with parsl.load(config):
 
@@ -297,6 +299,7 @@ with parsl.load(config):
     parser.add_argument('-t', '--max_trees', help='maximum gene trees (default:  %(default)s)', default=50, type=int, required=False)
     parser.add_argument('-g', '--max_group_size', help='maximum number of sequences permitted in a gene group (default:  %(default)s)', default=100, type=int, required=False)
     parser.add_argument('-e', '--blast_evalue', help='evalue used for blastn search in finding related gene sequences (default:  %(default)s)', default='1e-20', type=str, required=False)
+    parser.add_argument('-f', '--temp_files', help='keep intermediate files, including gene trees  (default:  %(default)s)', type=bool, default=False, required=False)
     args = parser.parse_args()
 
     catalog_file_name = os.path.abspath(args.input_file)
@@ -344,10 +347,13 @@ with parsl.load(config):
     copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
     print("Grouping the sequences")
     grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
-    print("Generate gene trees") # TODO: fix how this step has printed the futures, not the paths
-    gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[gene_tree_list_file])
+    print("Generate gene trees")
+    gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[grouping_future.outputs[0]], outputs=[gene_tree_list_file])
     print("Generate species tree")
     species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
     #species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file])
     species_tree_future.result()
+    if not args.temp_files:
+        import os
+        os.remove(WORKING_DIR)
 

@@ -355,6 +355,6 @@ with parsl.load(config):
     #species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file])
     species_tree_future.result()
     if not args.temp_files:
-        import os
-        os.remove(WORKING_DIR)
+        import shutil
+        shutil.rmtree(WORKING_DIR)
 

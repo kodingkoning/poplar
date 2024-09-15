@@ -11,6 +11,8 @@ cd dependencies
 conda config --add channels conda-forge
 conda create -n poplar_env python=3.10 numpy scikit-learn biopython parsl bioconda::orfipy mafft ncbi-datasets-cli
 conda activate poplar_env
+pip install 'parsl[monitoring]'
+conda install flask conda-forge::flask-sqlalchemy pandas plotly networkx # for monitoring
 
 EXTEND_PATH=""
 

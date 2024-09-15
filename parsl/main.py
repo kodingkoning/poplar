@@ -291,6 +291,7 @@ def make_temp_dir():
     import os
     return tempfile.mkdtemp(prefix=os.getcwd()+'/poplar_tmp_')
 
+config.retries = 2
 with parsl.load(config):
 
     parser = argparse.ArgumentParser()

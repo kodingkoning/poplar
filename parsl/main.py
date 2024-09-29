@@ -294,7 +294,7 @@ def astralpro(inputs=(), outputs=()):
     return f'''cat {bestTrees} > all_trees.out && sed -i 's/_gene[^:]*//g' all_trees.out && sed -i 's/_ORF[^:]*//g' all_trees.out && sed -i 's/_DN[^:]*//g' all_trees.out && astral-pro -i all_trees.out -o {outputs[0]}'''
 
 @python_app(cache=True)
-def make_temp_dir():
+def make_temp_dir(input_file: str):
     import tempfile
     import os
     return tempfile.mkdtemp(prefix=os.getcwd()+'/poplar_tmp_')
@@ -326,7 +326,7 @@ with parsl.load(config):
 
     CATALOG_PATH = os.path.dirname(catalog_file_name)
     SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
-    WORKING_DIR = make_temp_dir().result()
+    WORKING_DIR = make_temp_dir(catalog_file_name).result()
     os.chdir(WORKING_DIR)
     print(WORKING_DIR)
 

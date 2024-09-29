@@ -5,13 +5,20 @@ import os
 import glob
 from config import config
 from parsl.data_provider.files import File
+from parsl.utils import get_all_checkpoints
+from parsl.dataflow.memoization import id_for_memo
+
+# Required for making File compatible with checkpointing
+@id_for_memo.register
+def _(f: parsl.File, output_ref):
+    return str(f)
 
 # Throw error if file_path does not exist
 def check_file(file_path):
     if not os.path.isfile(file_path):
         raise argparse.ArgumentTypeError(f"File {file_path} does not exist")
 
-@python_app
+@python_app(cache=True)
 def combine_files(inputs=(), outputs=()):
     with open(outputs[0], 'w') as fout:
         for finname in inputs:
@@ -20,7 +27,7 @@ def combine_files(inputs=(), outputs=()):
     return outputs[0]
 
 # Get annotation sequences and iterate over file pairs in annotations.txt
-@bash_app
+@bash_app(cache=True)
 def annotations(line: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, outputs=()):
     import os
     os.chdir(WORKING_DIR)
@@ -41,7 +48,7 @@ def start_annotations_func(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str
     return combine_files(inputs=annotation_files, outputs=[outputs[0]])
 
 # Relabel genes and iterate over files in genes.txt, taking first element of each line as a species name and the second the file of the genes
-@bash_app
+@bash_app(cache=True)
 def relabel_genes(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=()):
     import os
     os.chdir(WORKING_DIR)
@@ -60,11 +67,12 @@ def start_relabel_genes(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, i
         output_files.append((relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[name, input_file], outputs=[output_file]).outputs[0]))
     return output_files
 
-@python_app
-def parse_catalog_func(filename, WORKING_DIR, outputs=()):
+@python_app(cache=True)
+def parse_catalog_func(WORKING_DIR, inputs=(), outputs=()):
     import os
     import json
     os.chdir(WORKING_DIR)
+    filename = inputs[0]
     with open(filename) as f:
         data = json.load(f)
     assemblies = data["assemblies"]
@@ -91,7 +99,7 @@ def parse_catalog_func(filename, WORKING_DIR, outputs=()):
                                         genomes_fout.write(assembly["accession"] + " " + fi["filePath"] + "\n")
     return True
 
-@bash_app
+@bash_app(cache=True)
 def find_orfs(name: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=()):
     import os
     os.chdir(WORKING_DIR)
@@ -116,11 +124,11 @@ def start_find_orfs(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, input
         output_files.append(app.outputs[0])
     return output_files
 
-@bash_app
+@bash_app(cache=True)
 def build_blast_db(WORKING_DIR: str, inputs=(), outputs=()): # in: cat *.fasta > all_species.all_fasta, out: genes.db
     return f'''cd {WORKING_DIR} && rm -f genes.db* && cat *.fasta > all_species.all_fasta && makeblastdb -input_type fasta -in all_species.all_fasta -blastdb_version 5 -title "grouping genes" -dbtype nucl -out {outputs[0]} && touch {outputs[0]}'''
 
-@bash_app
+@bash_app(cache=True)
 def search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), outputs=()):
     import os
     os.chdir(WORKING_DIR)
@@ -140,11 +148,11 @@ def start_search_blast(WORKING_DIR: str, blast_evalue: str, inputs=()):
         output_files.append(search_blast(WORKING_DIR, blast_evalue, inputs=[query, database], outputs=[fileout]).outputs[0])
     return output_files
 
-@bash_app
+@bash_app(cache=True)
 def copy_blast_to_csv(WORKING_DIR: str, inputs=(), outputs=()):
     return f'''cd {WORKING_DIR} && cat {' '.join(f.filepath for f in inputs[0])} > {outputs[0]}'''
 
-@python_app
+@python_app(cache=True)
 def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
     import os
     os.chdir(WORKING_DIR)
@@ -248,7 +256,7 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
         for filename in output_files:
             print(filename, file=fout)
  
-@bash_app
+@bash_app(cache=True)
 def seq_list_to_gene_tree(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
     input_file = inputs[0].strip()
     # TODO: correct the grep -l *.fasta path -- this is showing all files with matches with the queries from {input}
@@ -262,14 +270,14 @@ def seq_list_to_gene_tree(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool
     
     return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && {rm_input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {input_file}.aln && raxml-ng --search1 --msa {input_file}.aln --model GTR+G --prefix {input_file} && {rm_aln}'''
 
+@bash_app(cache=True)
+def select_random_genes(max_trees, inputs=(), outputs=()):
+    return f'''shuf -n {max_trees} {inputs[0]} > {outputs[0]}'''
+
 @join_app
 def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_files: bool, inputs=(), outputs=()):
-    import random
     with open(inputs[0], 'r') as fin:
         genes_for_trees = fin.readlines()
-    if len(genes_for_trees) > max_trees:
-        random.shuffle(genes_for_trees)
-        genes_for_trees = genes_for_trees[:max_trees]
     tree_files = []
     for gene_file in genes_for_trees:
         tree_file = File(f"{gene_file}.raxml.bestTree")
@@ -280,18 +288,21 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
             print(filename.filepath, file=fout)
     return tree_files
 
-@bash_app
+@bash_app(cache=True)
 def astralpro(inputs=(), outputs=()):
     bestTrees = ' '.join(f.filepath for f in inputs)
     return f'''cat {bestTrees} > all_trees.out && sed -i 's/_gene[^:]*//g' all_trees.out && sed -i 's/_ORF[^:]*//g' all_trees.out && sed -i 's/_DN[^:]*//g' all_trees.out && astral-pro -i all_trees.out -o {outputs[0]}'''
 
-@python_app
+@python_app(cache=True)
 def make_temp_dir():
     import tempfile
     import os
     return tempfile.mkdtemp(prefix=os.getcwd()+'/poplar_tmp_')
 
 config.retries = 2
+config.checkpoint_mode = 'task_exit'
+config.checkpoint_files = get_all_checkpoints()
+
 with parsl.load(config):
 
     parser = argparse.ArgumentParser()
@@ -319,6 +330,7 @@ with parsl.load(config):
     os.chdir(WORKING_DIR)
     print(WORKING_DIR)
 
+    catalog_file_name = File(catalog_file_name)
     gene_file = File(WORKING_DIR + "/genes.txt")
     genomes_file = File(WORKING_DIR + "/genomes.txt")
     annotations_file = File(WORKING_DIR + "/annotations.txt")
@@ -329,11 +341,12 @@ with parsl.load(config):
     blast_db_file = File(WORKING_DIR + "/genes.db")
     blast_csv = File(WORKING_DIR + "/blast_results.csv")
     group_list_file = File(WORKING_DIR + "/grouplist.txt")
+    selected_group_list_file = File(WORKING_DIR + "/selectedgrouplist.txt")
     gene_tree_list_file = File(WORKING_DIR + "/genetreelist.txt")
     output_tree_file = File(output_file_name)
 
     print("Parsing catalog")
-    parse_catalog_future = parse_catalog_func(catalog_file_name, WORKING_DIR, outputs=[gene_file, genomes_file, annotations_file])
+    parse_catalog_future = parse_catalog_func(WORKING_DIR, inputs=[catalog_file_name], outputs=[gene_file, genomes_file, annotations_file])
     print("Finding sequences from annotations")
     start_annotations = start_annotations_func(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[2]], outputs=[annotation_genes_file])
     combine_genes_and_annotations = combine_files(inputs=[parse_catalog_future.outputs[0], start_annotations.outputs[0]], outputs=[relabeled_gene_file])
@@ -349,12 +362,12 @@ with parsl.load(config):
     print("Grouping the sequences")
     grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
     print("Generate gene trees")
-    gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[grouping_future.outputs[0]], outputs=[gene_tree_list_file])
+    gene_list_future = select_random_genes(args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[selected_group_list_file])
+    gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file])
     print("Generate species tree")
     species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
-    #species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file])
+    # species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file])
     species_tree_future.result()
     if not args.temp_files:
         import shutil
         shutil.rmtree(WORKING_DIR)
-

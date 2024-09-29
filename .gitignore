@@ -4,3 +4,4 @@ __pycache__
 poplar_tmp*/
 *.out
 cmd_parsl*
+dependencies

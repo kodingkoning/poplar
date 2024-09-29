@@ -2,3 +2,5 @@ ncbi_dataset
 runinfo
 __pycache__
 poplar_tmp*/
+*.out
+cmd_parsl*

@@ -14,7 +14,7 @@ config = Config(
           HighThroughputExecutor(
                label="kahuna",
                worker_debug=False,
-               cores_per_worker=16.0,  # each worker uses a full node
+               cores_per_worker=2.0,  # each worker uses only 2 cores of a node
                provider=SlurmProvider(
                     partition='compute',  # partition
                     nodes_per_block=2,  # number of nodes
@@ -22,10 +22,19 @@ config = Config(
                     max_blocks=4,
                     scheduler_options='',
                     cmd_timeout=60,
-                    walltime='02:10:00',
+                    parallelism=0.1, # if no workload, no blocks provisioned
                     launcher=SrunLauncher(),
                     worker_init='conda activate poplar_env; export PATH=$PATH:$BLAST:$RAXML:$ASTRAL',  # requires conda environment with parsl
                ),
           )
      ],
+     monitoring=MonitoringHub( #  pip install 'parsl[monitoring]'
+          hub_address=address_by_hostname(),
+          hub_port=55055,
+          monitoring_debug=False,
+          resource_monitoring_interval=10,
+     ),
+     # Then use `parsl-visualize`, which require `conda install flask panda plotly networkx pydot; pip install flask_sqlalchemy`
+     # Connect to the server by using `ssh -L 50000:127.0.0.1.:8080 username@cluster` and then going to 127.0.0.1:50000 on the local machine's browser
+
 )

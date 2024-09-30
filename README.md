@@ -115,8 +115,10 @@ Parsl supports checkpointing, which is used in Poplar. When each task completes,
 
 ## Planned Improvements
 
-- Checkpointing using Parsl
-- Analysis of optimal gene sequence group size. Currently is required to be between 4 and 99.
+- Analysis of optimal gene sequence group size. Currently is required to be between 4 and 99
+- Options of software for each step
+- Performance improvement of selecting ORFs for sequence groups
+- Improvement on sequence group selection
 
 ## Citing Poplar
 

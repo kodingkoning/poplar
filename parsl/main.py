@@ -126,7 +126,7 @@ def start_find_orfs(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, input
 
 @bash_app(cache=True)
 def build_blast_db(WORKING_DIR: str, inputs=(), outputs=()): # in: cat *.fasta > all_species.all_fasta, out: genes.db
-    return f'''cd {WORKING_DIR} && rm -f genes.db* && cat *.fasta > all_species.all_fasta && makeblastdb -input_type fasta -in all_species.all_fasta -blastdb_version 5 -title "grouping genes" -dbtype nucl -out {outputs[0]} && touch {outputs[0]}'''
+    return f'''cd {WORKING_DIR} && rm -f genes.db* && cat {WORKING_DIR}/*.fasta > all_species.all_fasta && makeblastdb -input_type fasta -in all_species.all_fasta -blastdb_version 5 -title "grouping genes" -dbtype nucl -out {outputs[0]} && touch {outputs[0]}'''
 
 @bash_app(cache=True)
 def search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), outputs=()):
@@ -355,9 +355,9 @@ with parsl.load(config):
     print("Finding ORFs in unannotated genomes...")
     find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file])
     print("Building BLAST Database")
-    build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0]], outputs=[blast_db_file])
+    build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0], relabel_genes_future.result()], outputs=[blast_db_file])
     print("Searching BLAST DB for matching sequences")
-    blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future, find_orfs_future])
+    blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future.result(), find_orfs_future.result()])
     copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
     print("Grouping the sequences")
     grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])

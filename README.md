@@ -57,6 +57,8 @@ The recommended process for Linux installation is running `setup.sh`, which requ
 - [networkx 3.3](https://networkx.github.io/)
 - [pydot 3.0.1](https://github.com/erocarrera/pydot)
 
+Using other software versions may not work with Poplar.
+
 ## Parsl Configuration
 
 Parsl is a Python package used to manage parallel tasks. It can manage multiple Slurm job allocations, as it does in Poplar, and oversees running parallel and sequential tasks in Poplar.

@@ -43,11 +43,11 @@ The recommended process for Linux installation is running `setup.sh`, which requ
 - [RAxML-NG 1.2.2](https://github.com/amkozlov/raxml-ng)
 - [ASTRAL-Pro3](https://github.com/chaoszhang/ASTER)
 
-#### Optional for downloading NCBI data:
+#### Optional for downloading NCBI data, installed in `setup.sh`:
 
 - [NCBI Command-line Tools 16.27.2](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/)
 
-#### Optional for Parsl workflow monitoring:
+#### Optional for Parsl workflow monitoring, installed in `setup.sh`:
 
 - [Parsl Monitoring](https://parsl.readthedocs.io/en/stable/userguide/monitoring.html)
 - [flask 3.0.3](https://palletsprojects.com/projects/flask)

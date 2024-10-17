@@ -102,7 +102,7 @@ This tool works only on Linux/Unix machines due to dependencies. The provided sc
 
 If certain pre-compiled executables (such as for seqkit) cannot run on the provided architecture, there will be errors. These can be resolved by replacing the executables in their current locations.
 
-Jobs spawn other jobs and then wait for their completition. If jobs are forced to wait in the queue beyond the time limit of the originating job, then the pipeline might crash.
+Jobs spawn other jobs and then wait for their completion. If jobs are forced to wait in the queue beyond the time limit of the originating job, then the pipeline might crash.
 
 ## Steps
 

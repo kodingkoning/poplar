@@ -23,22 +23,30 @@ The recommended process for Linux installation is running `setup.sh`, which requ
 ### Required dependencies:
 
 - [Python 3.10](https://www.python.org/downloads/)
-- [Parsl](https://parsl.readthedocs.io/en/stable)
-- [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)
-- [numpy](https://numpy.org/)
-- [sklearn 1.3.0](https://scikit-learn.org/stable/index.html)
-- [biopython](https://biopython.org/docs/1.75/api/Bio.html)
-- [orfipy](https://pypi.org/project/orfipy/)
-- [BLAST](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
-- [MAFFT](https://mafft.cbrc.jp/alignment/software/)
-- [RAxML-NG](https://github.com/amkozlov/raxml-ng)
-- [BLAST](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
-- [RAxML-NG](https://github.com/amkozlov/raxml-ng)
+- [Parsl 2024.9.2](https://parsl.readthedocs.io/en/stable)
+- [conda 23.11.0](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html)
+- [numpy 2.1.1](https://numpy.org/)
+- [sklearn 1.5.1](https://scikit-learn.org/stable/index.html)
+- [biopython 1.84](https://biopython.org/docs/1.75/api/Bio.html)
+- [orfipy 0.0.4](https://pypi.org/project/orfipy/)
+- [BLAST 2.16.0](https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/LATEST/)
+- [MAFFT 7.526](https://mafft.cbrc.jp/alignment/software/)
+- [RAxML-NG 1.2.2](https://github.com/amkozlov/raxml-ng)
 - [ASTRAL-Pro3](https://github.com/chaoszhang/ASTER)
 
 #### Optional for downloading NCBI data:
 
-- [NCBI Command-line Tools](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/), for downloading NCBI data
+- [NCBI Command-line Tools 16.27.2](https://www.ncbi.nlm.nih.gov/datasets/docs/v2/download-and-install/)
+
+#### Optional for Parsl workflow monitoring:
+
+- [Parsl Monitoring](https://parsl.readthedocs.io/en/stable/userguide/monitoring.html)
+- [flask 3.0.3](https://palletsprojects.com/projects/flask)
+- [flask-sqlalchemy 3.1.1](https://flask-sqlalchemy.readthedocs.io/en/3.1.x/)
+- [pandas 2.2.2](https://pandas.pydata.org/)
+- [plotly 5.24.1](https://plot.ly/python/)
+- [networkx 3.3](https://networkx.github.io/)
+- [pydot 3.0.1](https://github.com/erocarrera/pydot)
 
 ## Parsl Configuration
 

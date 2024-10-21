@@ -145,6 +145,8 @@ When testing the [Kickxellomycotina dataset](https://mycocosm.jgi.doe.gov/mycoco
 - Performance improvement of selecting ORFs for sequence groups
 - Improvement on sequence group selection
 - Assess HDBSCAN in comparison to DBSCAN for performance and accuracy
+- Option to use HMMER for clustering
+- Pass RAxML options to user in configuration file
 
 ## Citing Poplar
 

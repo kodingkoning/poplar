@@ -2,7 +2,7 @@
 
 ## Features
 
-Popular is a software pipeline that uses an input of genes and assembled genomes and generates a phylogenetic tree from the input. It connects tools to identify genes within assembled genomes, group sequences to construct gene trees, and then infer a species tree based on the gene trees.
+Poplar is a software pipeline that uses an input of genes and assembled genomes and generates a phylogenetic tree from the input. It connects tools to identify genes within assembled genomes, group sequences to construct gene trees, and then infer a species tree based on the gene trees.
 
 ## Quickstart
 

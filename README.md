@@ -151,3 +151,7 @@ When testing the [Kickxellomycotina dataset](https://mycocosm.jgi.doe.gov/mycoco
 ## Citing Poplar
 
 Once a preprint is available, the citation will be here.
+
+## Copyright
+
+Copyright 2024 National Technology & Engineering Solutions of Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S. Government retains certain rights in this software.

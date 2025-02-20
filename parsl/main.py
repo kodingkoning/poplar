@@ -272,7 +272,7 @@ def seq_list_to_alignemnt(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool
     return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} {rm_input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file}'''
 
 @bash_app(cache=True)
-def alignent_to_gene_tree(remove-files: bool, inputs=(), outputs=()):
+def alignent_to_gene_tree(remove_files: bool, inputs=(), outputs=()):
     input_file = inputs[0]
     rm_input_file = ""
     rm_aln = ""
@@ -294,7 +294,7 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
         alignment_file = File(f"{gene_file}.aln")
         tree_file = File(f"{gene_file}.raxml.bestTree")
         align_task = seq_list_to_alignment(WORKING_DIR, SHARED_PATH, remove_files, inputs=[gene_file], outputs=[alignment_file])
-        tree_task = alignment_to_gene_tree(inputs=[align_task.outputs[0], outputs=[tree_file])
+        tree_task = alignment_to_gene_tree(inputs=[align_task.outputs[0]], outputs=[tree_file])
         tree_files.append(tree_task.outputs[0])
     with open(outputs[0], 'w') as fout:
         for filename in tree_files:

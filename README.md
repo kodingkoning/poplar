@@ -107,6 +107,8 @@ Options for Poplar are available in the help menu, by running `parsl/main.py -h`
 
 The pipeline will create a new directory within the current directory to store all the temporary files. One output tree will be named `job_{jobnum}.tree` and be in the current directory. The labels of this tree will match the accession IDs. If `dataset_catalog.json` contains a file of type `DATA_TABLE`, then Aasecond output tree named `job_{jobnum}_scinames.tree` will replace the accession IDs with the scientific names. This may be easier to read, but it will not differentiate between multiple instances of a single species, and it will not rename any species without an entry in the data table.
 
+The [Debugging document](debug.md) describes in more detail the output files and issues that may cause Poplar to fail.
+
 ## Limitations
 
 This tool works only on Linux/Unix machines due to dependencies. The provided scripts show running with Slurm Workload Manager, and users can adapt the Parsl configuration to work with other compatible managers.

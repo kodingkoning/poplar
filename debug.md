@@ -46,6 +46,8 @@ Running the Parsl monitoring requires including monitoring in the config and the
 
 Launching monitoring from a remote connection requires connecting to ssh with `ssh -L 50000:127.0.0.1.:8080 username@cluster`, running `parsl-visualize` on the remote machine, and then viewing in the browser at `http://127.0.0.1:50000` on the local machine.
 
+If you delete the files in `runinfo`, then you must restart `parsl-visualize` for it to update with the new files.
+
 ### Viewing Monitoring
 
 The front page of monitoring will list each workflow with information available in `runinfo`. Clicking on one of them will show the summary and the apps that have been queued and their statuses. The monitoring information is clearly labeled. The workflow DAG colored by task states can be particularly useful for understanding the progress of Poplar or the point of failure.

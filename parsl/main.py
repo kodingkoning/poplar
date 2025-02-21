@@ -297,7 +297,7 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
             print(filename, file=fout)
 
 @bash_app(cache=True)
-def seq_list_to_alignemnt(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
+def seq_list_to_alignment(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
     input_file = inputs[0].strip()
     output_file = outputs[0].strip()
     # TODO: correct the grep -l *.fasta path -- this is showing all files with matches with the queries from {input}
@@ -312,7 +312,7 @@ def seq_list_to_alignemnt(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool
     return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} {rm_input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file}'''
 
 @bash_app(cache=True)
-def alignent_to_gene_tree(remove_files: bool, inputs=(), outputs=()):
+def alignment_to_gene_tree(remove_files: bool, inputs=(), outputs=()):
     input_file = inputs[0]
     rm_input_file = ""
     rm_aln = ""

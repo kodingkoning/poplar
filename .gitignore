@@ -7,3 +7,4 @@ cmd_parsl*
 dependencies
 ncbi_dataset.zip
 Miniforge3-Linux-x86_64.sh
+data/

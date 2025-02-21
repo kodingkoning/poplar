@@ -58,3 +58,4 @@ cd ASTER && git pull && make && export PATH=$PATH:$PWD/bin && EXTEND_PATH=$EXTEN
 
 # Automatically updates worker_init in config.py
 sed -i -E "s%worker_init\s*=\s*'([^']*)'%worker_init='conda activate poplar_env; export PATH=\$PATH:$EXTEND_PATH'%gm;t" ../parsl/config.py
+sed -i -E "s%worker_init\s*=\s*'([^']*)'%worker_init='conda activate poplar_env; export PATH=\$PATH:$EXTEND_PATH'%gm;t" ../parsl/config_local.py

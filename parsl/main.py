@@ -8,6 +8,26 @@ from parsl.data_provider.files import File
 from parsl.utils import get_all_checkpoints
 from parsl.dataflow.memoization import id_for_memo
 
+# Packages used in apps. Import to confirm correct installation
+@python_app
+def check_imports():
+    import csv
+    import json
+    from shutil import which
+    import shutil
+    import numpy
+    from sklearn.cluster import DBSCAN
+    from scipy.sparse import lil_array
+    from scipy.sparse import csr_array
+    from sklearn.cluster import SpectralClustering
+    from sklearn.metrics import silhouette_score
+    from sklearn.neighbors import sort_graph_by_row_values
+    from collections import defaultdict
+    import tempfile
+    from parsl.data_provider.files import File
+    from parsl import bash_app
+    return True
+
 # Required for making File compatible with checkpointing
 @id_for_memo.register
 def _(f: parsl.File, output_ref):
@@ -357,6 +377,10 @@ with parsl.load(config):
     for exe, valid in zip(executables, valid_executables):
         if not valid:
             print(f"Error: Required commend {exe} not found.")
+
+    if not check_imports().result():
+        print(f"Error: Failed to import all required packages.")
+        exit()
 
     catalog_file_name = File(catalog_file_name)
     gene_file = File(WORKING_DIR + "/genes.txt")

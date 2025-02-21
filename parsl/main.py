@@ -17,6 +17,26 @@ def _(f: parsl.File, output_ref):
 def check_file(file_path):
     if not os.path.isfile(file_path):
         raise argparse.ArgumentTypeError(f"File {file_path} does not exist")
+    
+def check_catalog_files(CATALOG_PATH: str, filename: str):
+    import os
+    import json
+    os.chdir(CATALOG_PATH)
+    with open(filename) as f:
+        data = json.load(f)
+    assemblies = data["assemblies"]
+    for assembly in assemblies:
+        files = assembly["files"]
+        for file in files:
+            check_file(file["filePath"])
+
+@python_app
+def check_executables(inputs=(), outputs=()):
+    from shutil import which
+    outputs = [None] * len(inputs[0])
+    for index in range(len(inputs[0])):
+        outputs[index] = True if which(inputs[0][index]) != None else False
+    return outputs
 
 @python_app(cache=True)
 def combine_files(inputs=(), outputs=()):
@@ -255,10 +275,11 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
     with open(outputs[0], 'w') as fout:
         for filename in output_files:
             print(filename, file=fout)
- 
+
 @bash_app(cache=True)
-def seq_list_to_gene_tree(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
+def seq_list_to_alignemnt(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
     input_file = inputs[0].strip()
+    output_file = outputs[0].strip()
     # TODO: correct the grep -l *.fasta path -- this is showing all files with matches with the queries from {input}
     # This may also be referenced as 'all_species.all_fasta' -- which also has been using *.fasta, and should use actual paths
     # Group output was just the names of the genes, and then it needs to use seqkit to grab the actual sequences from the fasta files
@@ -268,7 +289,17 @@ def seq_list_to_gene_tree(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool
         rm_input_file = f'&& rm {input_file}'
         rm_aln = f'&& rm {input_file}.aln'
     
-    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} {rm_input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {input_file}.aln && raxml-ng --search1 --msa {input_file}.aln --model GTR+G --prefix {input_file} {rm_aln}'''
+    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} {rm_input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file}'''
+
+@bash_app(cache=True)
+def alignent_to_gene_tree(remove_files: bool, inputs=(), outputs=()):
+    input_file = inputs[0]
+    rm_input_file = ""
+    rm_aln = ""
+    if remove_files:
+        rm_input_file = f'&& rm {input_file}'
+        rm_aln = f'&& rm {input_file}'
+    return f'''raxml-ng --search1 --msa {input_file} --model GTR+G --prefix {input_file} {rm_aln}'''
 
 @bash_app(cache=True)
 def select_random_genes(max_trees, inputs=(), outputs=()):
@@ -280,8 +311,10 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
         genes_for_trees = fin.readlines()
     tree_files = []
     for gene_file in genes_for_trees:
+        alignment_file = File(f"{gene_file}.aln")
         tree_file = File(f"{gene_file}.raxml.bestTree")
-        tree_task = seq_list_to_gene_tree(WORKING_DIR, SHARED_PATH, remove_files, inputs=[gene_file], outputs=[tree_file])
+        align_task = seq_list_to_alignment(WORKING_DIR, SHARED_PATH, remove_files, inputs=[gene_file], outputs=[alignment_file])
+        tree_task = alignment_to_gene_tree(inputs=[align_task.outputs[0]], outputs=[tree_file])
         tree_files.append(tree_task.outputs[0])
     with open(outputs[0], 'w') as fout:
         for filename in tree_files:
@@ -328,7 +361,15 @@ with parsl.load(config):
     SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
     WORKING_DIR = make_temp_dir(catalog_file_name, output_file_name).result()
     os.chdir(WORKING_DIR)
-    print(WORKING_DIR)
+    print(f"Using temporary directory: {WORKING_DIR}")
+    check_catalog_files(CATALOG_PATH, catalog_file_name)
+
+    executables = ["echo", "cat", "rm", "touch", "grep", "mv", "sed", "shuf", f"{SHARED_PATH}/bedtools.static", f"{SHARED_PATH}/seqkit", "makeblastdb", "blastn", "orfipy", "mafft", "raxml-ng", "astral-pro"]
+    valid_executables = check_executables(inputs=[executables]).result()
+
+    for exe, valid in zip(executables, valid_executables):
+        if not valid:
+            print(f"Error: Required commend {exe} not found.")
 
     catalog_file_name = File(catalog_file_name)
     gene_file = File(WORKING_DIR + "/genes.txt")

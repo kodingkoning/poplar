@@ -163,7 +163,7 @@ When testing the [Kickxellomycotina dataset](https://mycocosm.jgi.doe.gov/mycoco
 
 ## Citing Poplar
 
-Once a preprint is available, the citation will be here.
+When using Poplar, please cite the preprint, available on bioRxiv: [https://doi.org/10.1101/2024.11.11.623070](https://doi.org/10.1101/2024.11.11.623070)
 
 ## Copyright
 

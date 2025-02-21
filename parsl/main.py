@@ -30,6 +30,14 @@ def check_catalog_files(CATALOG_PATH: str, filename: str):
         for file in files:
             check_file(file["filePath"])
 
+@python_app
+def check_executables(inputs=(), outputs=()):
+    from shutil import which
+    outputs = [None] * len(inputs[0])
+    for index in range(len(inputs[0])):
+        outputs[index] = True if which(inputs[0][index]) != None else False
+    return outputs
+
 @python_app(cache=True)
 def combine_files(inputs=(), outputs=()):
     with open(outputs[0], 'w') as fout:
@@ -344,15 +352,11 @@ with parsl.load(config):
     check_catalog_files(CATALOG_PATH, catalog_file_name)
 
     executables = ["echo", "cat", "rm", "touch", "grep", "mv", "sed", "shuf", f"{SHARED_PATH}/bedtools.static", f"{SHARED_PATH}/seqkit", "makeblastdb", "blastn", "orfipy", "mafft", "raxml-ng", "astral-pro"]
+    valid_executables = check_executables(inputs=[executables]).result()
 
-    dependency_missing = False
-    for exe in executables:
-        from shutil import which
-        if which(exe) is None:
-            print(f"Error: Required command {exe} not found.")
-            dependency_missing = True
-    if dependency_missing:
-        exit()
+    for exe, valid in zip(executables, valid_executables):
+        if not valid:
+            print(f"Error: Required commend {exe} not found.")
 
     catalog_file_name = File(catalog_file_name)
     gene_file = File(WORKING_DIR + "/genes.txt")

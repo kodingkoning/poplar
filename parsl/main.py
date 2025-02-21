@@ -17,6 +17,18 @@ def _(f: parsl.File, output_ref):
 def check_file(file_path):
     if not os.path.isfile(file_path):
         raise argparse.ArgumentTypeError(f"File {file_path} does not exist")
+    
+def check_catalog_files(CATALOG_PATH: str, filename: str):
+    import os
+    import json
+    os.chdir(CATALOG_PATH)
+    with open(filename) as f:
+        data = json.load(f)
+    assemblies = data["assemblies"]
+    for assembly in assemblies:
+        files = assembly["files"]
+        for file in files:
+            check_file(file["filePath"])
 
 @python_app(cache=True)
 def combine_files(inputs=(), outputs=()):
@@ -328,7 +340,19 @@ with parsl.load(config):
     SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
     WORKING_DIR = make_temp_dir(catalog_file_name, output_file_name).result()
     os.chdir(WORKING_DIR)
-    print(WORKING_DIR)
+    print(f"Using temporary directory: {WORKING_DIR}")
+    check_catalog_files(CATALOG_PATH, catalog_file_name)
+
+    executables = ["echo", "cat", "rm", "touch", "grep", "mv", "sed", "shuf", f"{SHARED_PATH}/bedtools.static", f"{SHARED_PATH}/seqkit", "makeblastdb", "blastn", "orfipy", "mafft", "raxml-ng", "astral-pro"]
+
+    dependency_missing = False
+    for exe in executables:
+        from shutil import which
+        if which(exe) is None:
+            print(f"Error: Required command {exe} not found.")
+            dependency_missing = True
+    if dependency_missing:
+        exit()
 
     catalog_file_name = File(catalog_file_name)
     gene_file = File(WORKING_DIR + "/genes.txt")

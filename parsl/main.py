@@ -298,8 +298,8 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
 
 @bash_app(cache=True)
 def seq_list_to_alignment(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
-    input_file = inputs[0].strip()
-    output_file = outputs[0].strip()
+    input_file = inputs[0]
+    output_file = outputs[0]
     # TODO: correct the grep -l *.fasta path -- this is showing all files with matches with the queries from {input}
     # This may also be referenced as 'all_species.all_fasta' -- which also has been using *.fasta, and should use actual paths
     # Group output was just the names of the genes, and then it needs to use seqkit to grab the actual sequences from the fasta files
@@ -319,7 +319,7 @@ def alignment_to_gene_tree(remove_files: bool, inputs=(), outputs=()):
     if remove_files:
         rm_input_file = f'&& rm {input_file}'
         rm_aln = f'&& rm {input_file}'
-    return f'''raxml-ng --search1 --msa {input_file} --model GTR+G --prefix {input_file} {rm_aln}'''
+    return f'''raxml-ng --search1 --msa {input_file} --model GTR+G --prefix {input_file} {rm_aln} {rm_input_file}'''
 
 @bash_app(cache=True)
 def select_random_genes(max_trees, inputs=(), outputs=()):
@@ -331,10 +331,11 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
         genes_for_trees = fin.readlines()
     tree_files = []
     for gene_file in genes_for_trees:
+        gene_file = gene_file.strip()
         alignment_file = File(f"{gene_file}.aln")
         tree_file = File(f"{gene_file}.raxml.bestTree")
         align_task = seq_list_to_alignment(WORKING_DIR, SHARED_PATH, remove_files, inputs=[gene_file], outputs=[alignment_file])
-        tree_task = alignment_to_gene_tree(inputs=[align_task.outputs[0]], outputs=[tree_file])
+        tree_task = alignment_to_gene_tree(remove_files, inputs=[align_task.outputs[0]], outputs=[tree_file])
         tree_files.append(tree_task.outputs[0])
     with open(outputs[0], 'w') as fout:
         for filename in tree_files:

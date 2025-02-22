@@ -304,22 +304,21 @@ def seq_list_to_alignment(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool
     # This may also be referenced as 'all_species.all_fasta' -- which also has been using *.fasta, and should use actual paths
     # Group output was just the names of the genes, and then it needs to use seqkit to grab the actual sequences from the fasta files
     rm_input_file = ""
-    rm_aln = ""
+    rm_fasta = ""
     if remove_files:
         rm_input_file = f'&& rm {input_file}'
-        rm_aln = f'&& rm {input_file}.aln'
+        rm_fasta = f'&& rm {input_file}.fasta'
     
-    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} {rm_input_file} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file}'''
+    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln {rm_fasta} && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file} && echo "alignment output at {output_file}"'''
 
 @bash_app(cache=True)
 def alignment_to_gene_tree(remove_files: bool, inputs=(), outputs=()):
     input_file = inputs[0]
-    rm_input_file = ""
     rm_aln = ""
     if remove_files:
-        rm_input_file = f'&& rm {input_file}'
         rm_aln = f'&& rm {input_file}'
-    return f'''raxml-ng --search1 --msa {input_file} --model GTR+G --prefix {input_file} {rm_aln} {rm_input_file}'''
+    # rm -f {input_file}.raxml.* is to prevent errors when the app is being retried
+    return f'''echo "running raxml-ng with input of {input_file}" && rm -f {input_file}.raxml.* && raxml-ng --search1 --msa {input_file} --model GTR+G --prefix {input_file}'''
 
 @bash_app(cache=True)
 def select_random_genes(max_trees, inputs=(), outputs=()):
@@ -333,9 +332,10 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
     for gene_file in genes_for_trees:
         gene_file = gene_file.strip()
         alignment_file = File(f"{gene_file}.aln")
-        tree_file = File(f"{gene_file}.raxml.bestTree")
+        tree_file = File(f"{gene_file}.aln.raxml.bestTree")
         align_task = seq_list_to_alignment(WORKING_DIR, SHARED_PATH, remove_files, inputs=[gene_file], outputs=[alignment_file])
         tree_task = alignment_to_gene_tree(remove_files, inputs=[align_task.outputs[0]], outputs=[tree_file])
+        # TODO: remove intermediate files if remove_files
         tree_files.append(tree_task.outputs[0])
     with open(outputs[0], 'w') as fout:
         for filename in tree_files:

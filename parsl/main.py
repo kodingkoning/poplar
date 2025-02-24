@@ -390,7 +390,8 @@ with parsl.load(config):
 
     for exe, valid in zip(executables, valid_executables):
         if not valid:
-            print(f"Error: Required commend {exe} not found.")
+            print(f"Error: Required command {exe} not found.")
+            exit()
 
     if not check_imports().result():
         print(f"Error: Failed to import all required packages.")

@@ -2,6 +2,7 @@ import parsl
 from parsl import python_app, bash_app, join_app
 import argparse
 import os
+from os import system
 import glob
 from config import config
 from parsl.data_provider.files import File
@@ -412,29 +413,62 @@ with parsl.load(config):
     gene_tree_list_file = File(WORKING_DIR + "/genetreelist.txt")
     output_tree_file = File(output_file_name)
 
-    print("Parsing catalog")
+    print("Adding catalog parsing app to workflow")
     parse_catalog_future = parse_catalog_func(WORKING_DIR, inputs=[catalog_file_name], outputs=[gene_file, genomes_file, annotations_file])
-    print("Finding sequences from annotations")
+    print("Adding app to workflow to finding sequences from annotations")
     start_annotations = start_annotations_func(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[2]], outputs=[annotation_genes_file])
     combine_genes_and_annotations = combine_files(inputs=[parse_catalog_future.outputs[0], start_annotations.outputs[0]], outputs=[relabeled_gene_file])
-    print("Relabeling genes")
+    print("Adding app to workflow to relabel genes")
     relabel_genes_future = start_relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR,inputs=[combine_genes_and_annotations.outputs[0]])
-    print("Finding ORFs in unannotated genomes...")
+    print("Adding app to workflow to find ORFs in unannotated genomes")
     find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file])
-    print("Building BLAST Database")
+    print("Adding app to workflow to build BLAST Database")
     build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0], relabel_genes_future.result()], outputs=[blast_db_file])
-    print("Searching BLAST DB for matching sequences")
+    print("Adding app to workflow to search BLAST DB for matching sequences")
     blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future.result(), find_orfs_future.result()])
     copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
-    print("Grouping the sequences")
+    print("Adding app to workflow to group the sequences")
     grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
-    print("Generate gene trees")
+    print("Adding app to workflow to generate gene trees")
     gene_list_future = select_random_genes(args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[selected_group_list_file])
     gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file])
-    print("Generate species tree")
+    print("Adding app to workflow to generate species tree")
     species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
-    # species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file])
+    # AppFuture result() is a blocking call until the app has completed
+    # Wait for parsing catalog
+    parse_catalog_future.result()
+    print("Parsed catalog")
+    # Wait for annotations
+    start_annotations.result()
+    combine_genes_and_annotations.result()
+    print("Found sequences from annotations")
+    # Wait for relabeling genes
+    relabel_genes_future.result()
+    print("Relabeled genes")
+    # Wait for finding ORFs
+    find_orfs_future.result()
+    print("Found ORFs")
+    # Wait for building BLAST DB
+    blast_search_future.result()
+    print("Built BLAST DB")
+    # Wait for searching BLAST
+    blast_search_future.result()
+    copy_future.result()
+    print("Searched BLAST DB")
+    # Wait for grouping
+    grouping_future.result()
+    print("Grouped sequences")
+    # Wait for gene alignments
+    gene_list_future.result()
+    print("Aligned gene sequences")
+    # Wait for gene trees
+    gene_tree_future.result()
+    print("Constructed gene trees")
+    # Wait for species tree
     species_tree_future.result()
     if not args.temp_files:
         import shutil
         shutil.rmtree(WORKING_DIR)
+
+    print("Constructed species tree:")
+    system(f"cat {output_tree_file}")

@@ -24,9 +24,9 @@ The main Python script will print message such as "Building BLAST Database". In 
 
 ### Run Info
 
-Parsl saves the output from the apps within `runinfo/##`. Typically, `runinfo/##/submit_scripts/parsl*.sh.out` and `runinfo/##/submit_scripts/parsl*.sh.err` are the most informative. These files contain stdout and sterr. If the fatal error immediately stopped the workflow from running, then the error will be at the end. However, typically the other apps will continue to execute until there is a dependency issue between a failed app and a queued app, so the error may be earlier in the output.
+Parsl saves the output from the apps within `runinfo/##`. If the error occurred within a the execution of a tool that was called in a bash app, then `runinfo/##/submit_scripts/parsl*.sh.out` and `runinfo/##/submit_scripts/parsl*.sh.err` are the most informative. These files contain stdout and sterr. If the fatal error immediately stopped the workflow from running, then the error will be at the end. However, other apps can continue to execute until there is a dependency issue between a failed app and a queued app, so the error may be earlier in the output.
 
-The log in `runinfo/##/parsl.log` is more expansive but can be quite informative as well. Searching for "ERROR" can help quickly find failures, while "error" will often be referencing the redirection of standard error and not indicate any failure.
+If the error is in the Python part of a bash app or in a python app, then the log in `runinfo/##/parsl.log` will have information on the error. This file is more expansive but can be quite informative as well. Searching for "ERROR" can help quickly find failures, while "error" will often be referencing the redirection of standard error and not indicate any failure.
 
 Some commands within Poplar will have additional logs, and these will be referenced in stdout and will be located in the temporary directory.
 

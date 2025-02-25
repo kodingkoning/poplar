@@ -2,6 +2,16 @@
 
 This document will expand as more types of errors are documented.
 
+## Useful Files
+
+When trying to identify an error when running Parsl, looking at the output files in this order is likely to be most useful:
+
+1. Standard out/err from job submission or local output
+
+2. `parsl.log` from `runinfo/###`
+
+3. Files in `runinfo/###/submit_scripts`
+
 ## Common Errors
 
 ### Input Files
@@ -24,9 +34,9 @@ The main Python script will print message such as "Building BLAST Database". In 
 
 ### Run Info
 
-Parsl saves the output from the apps within `runinfo/##`. If the error occurred within a the execution of a tool that was called in a bash app, then `runinfo/##/submit_scripts/parsl*.sh.out` and `runinfo/##/submit_scripts/parsl*.sh.err` are the most informative. These files contain stdout and sterr. If the fatal error immediately stopped the workflow from running, then the error will be at the end. However, other apps can continue to execute until there is a dependency issue between a failed app and a queued app, so the error may be earlier in the output.
+Parsl saves the output from the apps within `runinfo/###`. If the error occurred within a the execution of a tool that was called in a bash app, then `runinfo/###/submit_scripts/parsl*.sh.out` and `runinfo/###/submit_scripts/parsl*.sh.err` are the most informative. These files contain stdout and sterr. If the fatal error immediately stopped the workflow from running, then the error will be at the end. However, other apps can continue to execute until there is a dependency issue between a failed app and a queued app, so the error may be earlier in the output.
 
-If the error is in the Python part of a bash app or in a python app, then the log in `runinfo/##/parsl.log` will have information on the error. This file is more expansive but can be quite informative as well. Searching for "ERROR" can help quickly find failures, while "error" will often be referencing the redirection of standard error and not indicate any failure.
+If the error is in the Python part of a bash app or in a python app, then the log in `runinfo/###/parsl.log` will have information on the error. This file is more expansive but can be quite informative as well. Searching for "ERROR" can help quickly find failures, while "error" will often be referencing the redirection of standard error and not indicate any failure.
 
 Some commands within Poplar will have additional logs, and these will be referenced in stdout and will be located in the temporary directory.
 
@@ -36,7 +46,7 @@ Noting the presence or absense of output in the temporary directory can be usefu
 
 ### Checkpointing
 
-By default, Poplar will use checkpointing. If you rerun Poplar with the same command line arguments (even if the files have changed internally) it will use the checkpoints from previous runs. Depending on the failure type, Poplar may rerun failed apps. For example, if the submitted job ran out of time, Poplar should rerun that app. Other times, such as if the failure cascaded through apps before Poplar exited, Poplar will not rerun the apps with invalid output, and the checkpoints need to be deleted from `runinfo/##/checkpoint`.
+By default, Poplar will use checkpointing. If you rerun Poplar with the same command line arguments (even if the files have changed internally) it will use the checkpoints from previous runs. Depending on the failure type, Poplar may rerun failed apps. For example, if the submitted job ran out of time, Poplar should rerun that app. Other times, such as if the failure cascaded through apps before Poplar exited, Poplar will not rerun the apps with invalid output, and the checkpoints need to be deleted from `runinfo/###/checkpoint`.
 
 ## Monitoring
 

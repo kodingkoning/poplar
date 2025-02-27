@@ -431,43 +431,43 @@ if __name__ == "__main__":
         print("Adding app to workflow to generate gene trees")
         gene_list_future = select_random_genes(args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[selected_group_list_file])
         gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file])
-        print("Adding app to workflow to generate species tree")
+        print("Adding app to workflow to generate species tree", flush=True)
         species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
         # AppFuture result() is a blocking call until the app has completed
         # Wait for parsing catalog
         parse_catalog_future.result()
-        print("Parsed catalog")
+        print("Parsed catalog", flush=True)
         # Wait for annotations
         start_annotations.result()
         combine_genes_and_annotations.result()
-        print("Found sequences from annotations")
+        print("Found sequences from annotations", flush=True)
         # Wait for relabeling genes
         relabel_genes_future.result()
-        print("Relabeled genes")
+        print("Relabeled genes", flush=True)
         # Wait for finding ORFs
         find_orfs_future.result()
-        print("Found ORFs")
+        print("Found ORFs", flush=True)
         # Wait for building BLAST DB
         blast_search_future.result()
-        print("Built BLAST DB")
+        print("Built BLAST DB", flush=True)
         # Wait for searching BLAST
         blast_search_future.result()
         copy_future.result()
-        print("Searched BLAST DB")
+        print("Searched BLAST DB", flush=True)
         # Wait for grouping
         grouping_future.result()
-        print("Grouped sequences")
+        print("Grouped sequences", flush=True)
         # Wait for gene alignments
         gene_list_future.result()
-        print("Aligned gene sequences")
+        print("Aligned gene sequences", flush=True)
         # Wait for gene trees
         gene_tree_future.result()
-        print("Constructed gene trees")
+        print("Constructed gene trees", flush=True)
         # Wait for species tree
         species_tree_future.result()
         if not args.temp_files:
             import shutil
             shutil.rmtree(WORKING_DIR)
 
-        print("Constructed species tree:")
+        print("Constructed species tree:", flush=True)
         system(f"cat {output_tree_file}")

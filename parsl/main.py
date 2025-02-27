@@ -354,121 +354,122 @@ def make_temp_dir(input_file: str, output_file: str):
     import os
     return tempfile.mkdtemp(prefix=os.getcwd()+'/poplar_tmp_')
 
-config.retries = 2
-config.checkpoint_mode = 'task_exit'
-config.checkpoint_files = get_all_checkpoints()
+if __name__ == "__main__":
+    config.retries = 2
+    config.checkpoint_mode = 'task_exit'
+    config.checkpoint_files = get_all_checkpoints()
 
-with parsl.load(config):
+    with parsl.load(config):
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('input_file', help='path to input json file', type=str)
-    parser.add_argument('-o', '--output_file', help='path to output file (default:  %(default)s)', default="output.tree", type=str, required=False)
-    parser.add_argument('-t', '--max_trees', help='maximum gene trees (default:  %(default)s)', default=50, type=int, required=False)
-    parser.add_argument('-g', '--max_group_size', help='maximum number of sequences permitted in a gene group (default:  %(default)s)', default=100, type=int, required=False)
-    parser.add_argument('-e', '--blast_evalue', help='evalue used for blastn search in finding related gene sequences (default:  %(default)s)', default='1e-20', type=str, required=False)
-    parser.add_argument('-f', '--temp_files', help='keep intermediate files, including gene trees  (default:  %(default)s)', type=bool, default=False, required=False)
-    args = parser.parse_args()
+        parser = argparse.ArgumentParser()
+        parser.add_argument('input_file', help='path to input json file', type=str)
+        parser.add_argument('-o', '--output_file', help='path to output file (default:  %(default)s)', default="output.tree", type=str, required=False)
+        parser.add_argument('-t', '--max_trees', help='maximum gene trees (default:  %(default)s)', default=50, type=int, required=False)
+        parser.add_argument('-g', '--max_group_size', help='maximum number of sequences permitted in a gene group (default:  %(default)s)', default=100, type=int, required=False)
+        parser.add_argument('-e', '--blast_evalue', help='evalue used for blastn search in finding related gene sequences (default:  %(default)s)', default='1e-20', type=str, required=False)
+        parser.add_argument('-f', '--temp_files', help='keep intermediate files, including gene trees  (default:  %(default)s)', type=bool, default=False, required=False)
+        args = parser.parse_args()
 
-    catalog_file_name = os.path.abspath(args.input_file)
-    output_file_name = os.getcwd() + "/" + args.output_file
-    if not float(args.blast_evalue) < 1:
-        print(f"Error: blast_evalue must be a number less than 1")
-        exit()
-    check_file(args.input_file)
+        catalog_file_name = os.path.abspath(args.input_file)
+        output_file_name = os.getcwd() + "/" + args.output_file
+        if not float(args.blast_evalue) < 1:
+            print(f"Error: blast_evalue must be a number less than 1")
+            exit()
+        check_file(args.input_file)
 
-    print(f"Input file: {catalog_file_name}")
-    print(f"Output file: {output_file_name}")
+        print(f"Input file: {catalog_file_name}")
+        print(f"Output file: {output_file_name}")
 
-    CATALOG_PATH = os.path.dirname(catalog_file_name)
-    SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
-    WORKING_DIR = make_temp_dir(catalog_file_name, output_file_name).result()
-    os.chdir(WORKING_DIR)
-    print(f"Using temporary directory: {WORKING_DIR}")
-    check_catalog_files(CATALOG_PATH, catalog_file_name)
+        CATALOG_PATH = os.path.dirname(catalog_file_name)
+        SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
+        WORKING_DIR = make_temp_dir(catalog_file_name, output_file_name).result()
+        os.chdir(WORKING_DIR)
+        print(f"Using temporary directory: {WORKING_DIR}")
+        check_catalog_files(CATALOG_PATH, catalog_file_name)
 
-    executables = ["echo", "cat", "rm", "touch", "grep", "mv", "sed", "shuf", f"{SHARED_PATH}/bedtools.static", f"{SHARED_PATH}/seqkit", "makeblastdb", "blastn", "orfipy", "mafft", "raxml-ng", "astral-pro"]
-    valid_executables = check_executables(inputs=[executables]).result()
+        executables = ["echo", "cat", "rm", "touch", "grep", "mv", "sed", "shuf", f"{SHARED_PATH}/bedtools.static", f"{SHARED_PATH}/seqkit", "makeblastdb", "blastn", "orfipy", "mafft", "raxml-ng", "astral-pro"]
+        valid_executables = check_executables(inputs=[executables]).result()
 
-    for exe, valid in zip(executables, valid_executables):
-        if not valid:
-            print(f"Error: Required command {exe} not found.")
+        for exe, valid in zip(executables, valid_executables):
+            if not valid:
+                print(f"Error: Required command {exe} not found.")
+                exit()
+
+        if not check_imports().result():
+            print(f"Error: Failed to import all required packages.")
             exit()
 
-    if not check_imports().result():
-        print(f"Error: Failed to import all required packages.")
-        exit()
+        catalog_file_name = File(catalog_file_name)
+        gene_file = File(WORKING_DIR + "/genes.txt")
+        genomes_file = File(WORKING_DIR + "/genomes.txt")
+        annotations_file = File(WORKING_DIR + "/annotations.txt")
+        annotation_genes_file = File(WORKING_DIR + "/annotation_genes.txt")
+        relabeled_gene_file= File(WORKING_DIR + "/relabeled_genes.txt")
+        query_genes_file = File(WORKING_DIR + "/query_genes.query_fasta")
+        all_genes_file = File(WORKING_DIR + "/all_species.all_fasta")
+        blast_db_file = File(WORKING_DIR + "/genes.db")
+        blast_csv = File(WORKING_DIR + "/blast_results.csv")
+        group_list_file = File(WORKING_DIR + "/grouplist.txt")
+        selected_group_list_file = File(WORKING_DIR + "/selectedgrouplist.txt")
+        gene_tree_list_file = File(WORKING_DIR + "/genetreelist.txt")
+        output_tree_file = File(output_file_name)
 
-    catalog_file_name = File(catalog_file_name)
-    gene_file = File(WORKING_DIR + "/genes.txt")
-    genomes_file = File(WORKING_DIR + "/genomes.txt")
-    annotations_file = File(WORKING_DIR + "/annotations.txt")
-    annotation_genes_file = File(WORKING_DIR + "/annotation_genes.txt")
-    relabeled_gene_file= File(WORKING_DIR + "/relabeled_genes.txt")
-    query_genes_file = File(WORKING_DIR + "/query_genes.query_fasta")
-    all_genes_file = File(WORKING_DIR + "/all_species.all_fasta")
-    blast_db_file = File(WORKING_DIR + "/genes.db")
-    blast_csv = File(WORKING_DIR + "/blast_results.csv")
-    group_list_file = File(WORKING_DIR + "/grouplist.txt")
-    selected_group_list_file = File(WORKING_DIR + "/selectedgrouplist.txt")
-    gene_tree_list_file = File(WORKING_DIR + "/genetreelist.txt")
-    output_tree_file = File(output_file_name)
+        print("Adding catalog parsing app to workflow")
+        parse_catalog_future = parse_catalog_func(WORKING_DIR, inputs=[catalog_file_name], outputs=[gene_file, genomes_file, annotations_file])
+        print("Adding app to workflow to finding sequences from annotations")
+        start_annotations = start_annotations_func(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[2]], outputs=[annotation_genes_file])
+        combine_genes_and_annotations = combine_files(inputs=[parse_catalog_future.outputs[0], start_annotations.outputs[0]], outputs=[relabeled_gene_file])
+        print("Adding app to workflow to relabel genes")
+        relabel_genes_future = start_relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR,inputs=[combine_genes_and_annotations.outputs[0]])
+        print("Adding app to workflow to find ORFs in unannotated genomes")
+        find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file])
+        print("Adding app to workflow to build BLAST Database")
+        build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0], relabel_genes_future.result()], outputs=[blast_db_file])
+        print("Adding app to workflow to search BLAST DB for matching sequences")
+        blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future.result(), find_orfs_future.result()])
+        copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
+        print("Adding app to workflow to group the sequences")
+        grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
+        print("Adding app to workflow to generate gene trees")
+        gene_list_future = select_random_genes(args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[selected_group_list_file])
+        gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file])
+        print("Adding app to workflow to generate species tree")
+        species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
+        # AppFuture result() is a blocking call until the app has completed
+        # Wait for parsing catalog
+        parse_catalog_future.result()
+        print("Parsed catalog")
+        # Wait for annotations
+        start_annotations.result()
+        combine_genes_and_annotations.result()
+        print("Found sequences from annotations")
+        # Wait for relabeling genes
+        relabel_genes_future.result()
+        print("Relabeled genes")
+        # Wait for finding ORFs
+        find_orfs_future.result()
+        print("Found ORFs")
+        # Wait for building BLAST DB
+        blast_search_future.result()
+        print("Built BLAST DB")
+        # Wait for searching BLAST
+        blast_search_future.result()
+        copy_future.result()
+        print("Searched BLAST DB")
+        # Wait for grouping
+        grouping_future.result()
+        print("Grouped sequences")
+        # Wait for gene alignments
+        gene_list_future.result()
+        print("Aligned gene sequences")
+        # Wait for gene trees
+        gene_tree_future.result()
+        print("Constructed gene trees")
+        # Wait for species tree
+        species_tree_future.result()
+        if not args.temp_files:
+            import shutil
+            shutil.rmtree(WORKING_DIR)
 
-    print("Adding catalog parsing app to workflow")
-    parse_catalog_future = parse_catalog_func(WORKING_DIR, inputs=[catalog_file_name], outputs=[gene_file, genomes_file, annotations_file])
-    print("Adding app to workflow to finding sequences from annotations")
-    start_annotations = start_annotations_func(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[2]], outputs=[annotation_genes_file])
-    combine_genes_and_annotations = combine_files(inputs=[parse_catalog_future.outputs[0], start_annotations.outputs[0]], outputs=[relabeled_gene_file])
-    print("Adding app to workflow to relabel genes")
-    relabel_genes_future = start_relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR,inputs=[combine_genes_and_annotations.outputs[0]])
-    print("Adding app to workflow to find ORFs in unannotated genomes")
-    find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file])
-    print("Adding app to workflow to build BLAST Database")
-    build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0], relabel_genes_future.result()], outputs=[blast_db_file])
-    print("Adding app to workflow to search BLAST DB for matching sequences")
-    blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future.result(), find_orfs_future.result()])
-    copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
-    print("Adding app to workflow to group the sequences")
-    grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
-    print("Adding app to workflow to generate gene trees")
-    gene_list_future = select_random_genes(args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[selected_group_list_file])
-    gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file])
-    print("Adding app to workflow to generate species tree")
-    species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
-    # AppFuture result() is a blocking call until the app has completed
-    # Wait for parsing catalog
-    parse_catalog_future.result()
-    print("Parsed catalog")
-    # Wait for annotations
-    start_annotations.result()
-    combine_genes_and_annotations.result()
-    print("Found sequences from annotations")
-    # Wait for relabeling genes
-    relabel_genes_future.result()
-    print("Relabeled genes")
-    # Wait for finding ORFs
-    find_orfs_future.result()
-    print("Found ORFs")
-    # Wait for building BLAST DB
-    blast_search_future.result()
-    print("Built BLAST DB")
-    # Wait for searching BLAST
-    blast_search_future.result()
-    copy_future.result()
-    print("Searched BLAST DB")
-    # Wait for grouping
-    grouping_future.result()
-    print("Grouped sequences")
-    # Wait for gene alignments
-    gene_list_future.result()
-    print("Aligned gene sequences")
-    # Wait for gene trees
-    gene_tree_future.result()
-    print("Constructed gene trees")
-    # Wait for species tree
-    species_tree_future.result()
-    if not args.temp_files:
-        import shutil
-        shutil.rmtree(WORKING_DIR)
-
-    print("Constructed species tree:")
-    system(f"cat {output_tree_file}")
+        print("Constructed species tree:")
+        system(f"cat {output_tree_file}")

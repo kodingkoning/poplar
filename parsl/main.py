@@ -301,16 +301,14 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
 def seq_list_to_alignment(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
     input_file = inputs[0]
     output_file = outputs[0]
-    # TODO: correct the grep -l *.fasta path -- this is showing all files with matches with the queries from {input}
-    # This may also be referenced as 'all_species.all_fasta' -- which also has been using *.fasta, and should use actual paths
-    # Group output was just the names of the genes, and then it needs to use seqkit to grab the actual sequences from the fasta files
     rm_input_file = ""
     rm_fasta = ""
     if remove_files:
         rm_input_file = f'&& rm {input_file}'
         rm_fasta = f'&& rm {input_file}.fasta'
     
-    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/*.fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln {rm_fasta} && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file} && echo "alignment output at {output_file}"'''
+    # TODO: seqkit must be failing because {input_file} doesn't exist when it's supposed to
+    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/all_species.all_fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln {rm_fasta} && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file} && echo "alignment output at {output_file}"'''
 
 @bash_app(cache=True)
 def alignment_to_gene_tree(remove_files: bool, inputs=(), outputs=()):

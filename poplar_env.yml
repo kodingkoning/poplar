@@ -3,6 +3,7 @@ channels:
   - bioconda
   - conda-forge
   - defaults
+  - r
 dependencies:
   - _libgcc_mutex=0.1=conda_forge
   - _openmp_mutex=4.5=2_gnu
@@ -112,4 +113,4 @@ dependencies:
       - tenacity==8.3.0
       - tzdata==2024.1
       - werkzeug==3.0.3
-prefix: /home/erkonin/.conda/envs/poplar_env
+prefix: ~/.conda/envs/poplar_env

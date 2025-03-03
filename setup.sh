@@ -2,9 +2,12 @@
 
 # Run this in the location you would like to download the dependencies
 
+WORKING_DIR=$PWD
+
 # Download into "dependencies" directory
 mkdir -p dependencies
 cd dependencies
+DEPENDENCIES_DIR=$PWD
 
 if ! conda info --envs | grep -q "^poplar_env\b"; then
   conda env create -f ../poplar_env.yml --solver classic
@@ -54,7 +57,16 @@ unzip -u raxml-ng_v1.2.2_linux_x86_64.zip && echo "Add to PATH: " $PWD && export
 if [ ! -d "ASTER" ]; then
   git clone https://github.com/chaoszhang/ASTER.git
 fi
-cd ASTER && git pull && make && export PATH=$PATH:$PWD/bin && EXTEND_PATH=$EXTEND_PATH:$PWD/bin && cd ..
+cd ASTER
+if git pull ; then
+  make
+else
+  git pull --rebase
+  make
+fi
+export PATH=$PATH:$PWD/bin && EXTEND_PATH=$EXTEND_PATH:$PWD/bin
+cd ..
 
 # Automatically updates worker_init in config.py
 sed -i -E "s%worker_init\s*=\s*'([^']*)'%worker_init='conda activate poplar_env; export PATH=\$PATH:$EXTEND_PATH'%gm;t" ../parsl/config.py
+sed -i -E "s%worker_init\s*=\s*'([^']*)'%worker_init='conda activate poplar_env; export PATH=\$PATH:$EXTEND_PATH'%gm;t" ../parsl/config_local.py

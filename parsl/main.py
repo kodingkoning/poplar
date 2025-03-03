@@ -16,11 +16,9 @@ def read_config(file_path):
     config = configparser.ConfigParser()
     config.read(file_path)
     # Accessing the parameters
-    hdbscan_params = {
-        'min_cluster_size': config.getint('HDBSCAN', 'min_cluster_size', fallback=None),
-        'min_samples': config.getint('HDBSCAN', 'min_samples', fallback=None),
-        'cluster_selection_epsilon': config.getfloat('HDBSCAN', 'cluster_selection_epsilon', fallback=None),
-        'alpha': config.getfloat('HDBSCAN', 'alpha', fallback=None),
+    dbscan_params = {
+        'min_samples': config.getint('DBSCAN', 'min_samples', fallback=3),
+        'eps': config.getfloat('DBSCAN', 'cluster_selection_epsilon', fallback=1),
     }
     blastn_params = {
         'word_size': config.getint('blastn', 'word_size', fallback=None),
@@ -52,7 +50,7 @@ def read_config(file_path):
         'round': config.getint('astral-pro', 'round', fallback=None),
         'subsample': config.getint('astral-pro', 'subsample', fallback=None),
     }
-    return hdbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_pro_params
+    return dbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_pro_params
 
 # Packages used in apps. Import to confirm correct installation
 @python_app
@@ -62,7 +60,7 @@ def check_imports():
     from shutil import which
     import shutil
     import numpy
-    from sklearn.cluster import HDBSCAN
+    from sklearn.cluster import DBSCAN
     from scipy.sparse import lil_array
     from sklearn.metrics import silhouette_score
     from sklearn.neighbors import sort_graph_by_row_values
@@ -277,6 +275,13 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=(), params=None):
 
     # Define the path to your BLAST results file
     blast_results_file = inputs[0]  # Replace with your file path
+    
+    # Get parameters
+    eps = 1
+    min_samples = 3
+    if params:
+        eps = params['eps'] if params['eps'] != None else eps
+        min_samples = params['min_samples'] if params['min_samples'] != None else min_samples
 
     # Define the minimum number of clusters as 1/N (N specified via command line)
     # Replace N with the appropriate value or use a command-line argument parser
@@ -337,11 +342,7 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=(), params=None):
 
     # Compute DBSCAN
     # whether eps is 0.1 or 1, the groups are the same (above the threshold of the blast search)
-    #db = DBSCAN(metric="precomputed", eps = 1, min_samples=3, n_jobs=-1).fit(distance_matrix)
-    db = DBSCAN(metric="precomputed", eps = 1, min_samples=3, n_jobs=-1).fit(distance_matrix)
-    #min_cluster_size=hdbscan_params['min_cluster_size'], min_samples=hdbscan_params['min_samples'], cluster_selection_epsilon=hdbscan_params['cluster_selection_epsilon'], alpha=hdbscan_params['alpha'])
-    # Fit the model to the distance matrix
-    # db.fit(distance_matrix)
+    db = DBSCAN(metric="precomputed", eps = eps, min_samples = min_samples, n_jobs=-1).fit(distance_matrix)
     labels = db.labels_
     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
     n_noise_ = list(labels).count(-1)
@@ -482,14 +483,14 @@ if __name__ == "__main__":
 
         # Read configuration file if provided
         config_params = None
-        hdbscan_params = None
+        dbscan_params = None
         blastn_params = None
         orfipy_params = None
         mafft_params = None
         raxml_params = None
         astral_pro_params = None
         if args.config_file:
-            hdbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_pro_params = read_config(args.config_file)  # Assuming read_config returns a dictionary of parameters
+            dbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_pro_params = read_config(args.config_file)  # Assuming read_config returns a dictionary of parameters
 
         catalog_file_name = os.path.abspath(args.input_file)
         output_file_name = os.getcwd() + "/" + args.output_file

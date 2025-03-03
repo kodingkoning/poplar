@@ -501,14 +501,7 @@ if __name__ == "__main__":
 
         print(f"Input file: {catalog_file_name}")
         print(f"Output file: {output_file_name}")
-
-        CATALOG_PATH = os.path.dirname(catalog_file_name)
-        SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
-        WORKING_DIR = make_temp_dir(catalog_file_name, output_file_name).result()
-        os.chdir(WORKING_DIR)
-        print(f"Using temporary directory: {WORKING_DIR}")
-        check_catalog_files(CATALOG_PATH, catalog_file_name)
-
+        
         executables = ["echo", "cat", "rm", "touch", "grep", "mv", "sed", "shuf", f"{SHARED_PATH}/bedtools.static", f"{SHARED_PATH}/seqkit", "makeblastdb", "blastn", "orfipy", "mafft", "raxml-ng", "astral-pro"]
         valid_executables = check_executables(inputs=[executables]).result()
 
@@ -520,6 +513,13 @@ if __name__ == "__main__":
         if not check_imports().result():
             print(f"Error: Failed to import all required packages.")
             exit()
+
+        CATALOG_PATH = os.path.dirname(catalog_file_name)
+        SHARED_PATH = os.path.dirname(os.path.abspath(__file__))
+        WORKING_DIR = make_temp_dir(catalog_file_name, output_file_name).result()
+        os.chdir(WORKING_DIR)
+        print(f"Using temporary directory: {WORKING_DIR}")
+        check_catalog_files(CATALOG_PATH, catalog_file_name)
 
         catalog_file_name = File(catalog_file_name)
         gene_file = File(WORKING_DIR + "/genes.txt")

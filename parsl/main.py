@@ -8,6 +8,49 @@ from config import config
 from parsl.data_provider.files import File
 from parsl.utils import get_all_checkpoints
 from parsl.dataflow.memoization import id_for_memo
+import configparser
+
+##function to read config file
+
+def read_config(file_path):
+    config = configparser.ConfigParser()
+    config.read(file_path)
+    # Accessing the parameters
+    dbscan_params = {
+        'min_samples': config.getint('DBSCAN', 'min_samples', fallback=3),
+        'eps': config.getfloat('DBSCAN', 'cluster_selection_epsilon', fallback=1),
+    }
+    blastn_params = {
+        'word_size': config.getint('blastn', 'word_size', fallback=None),
+        'gapopen': config.getint('blastn', 'gapopen', fallback=None),
+        'gapextend': config.getint('blastn', 'gapextend', fallback=None),
+        'reward': config.getint('blastn', 'reward', fallback=None),
+        'penalty': config.getint('blastn', 'penalty', fallback=None),
+    }
+    orfipy_params = {
+        'min': config.getint('orfipy', 'min', fallback=1000),
+        'max': config.getint('orfipy', 'max', fallback=None),
+        'start': config.get('orfipy', 'start').split(',') if config.has_option('orfipy', 'start') else None,
+        'stop': config.get('orfipy', 'stop').split(',') if config.has_option('orfipy', 'stop') else None,
+    }
+    mafft_params = {
+        'op': config.getfloat('mafft', 'op', fallback=None),
+        'ep': config.getfloat('mafft', 'ep', fallback=None),
+        'maxiterate': config.getint('mafft', 'maxiterate', fallback=None),
+    }
+    raxml_params = {
+        'tree': config.get('raxml', 'tree', fallback=None),
+        'model': config.get('raxml', 'model', fallback=None),
+        'opt_model': config.getboolean('raxml', 'opt-model', fallback=None),
+        'opt_branches': config.getboolean('raxml', 'opt-branches', fallback=None),
+        'blmin': config.getfloat('raxml', 'blmin', fallback=None),
+        'blmax': config.getfloat('raxml', 'blmax', fallback=None),
+    }
+    astral_pro_params = {
+        'round': config.getint('astral-pro', 'round', fallback=None),
+        'subsample': config.getint('astral-pro', 'subsample', fallback=None),
+    }
+    return dbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_pro_params
 
 # Packages used in apps. Import to confirm correct installation
 @python_app
@@ -19,8 +62,6 @@ def check_imports():
     import numpy
     from sklearn.cluster import DBSCAN
     from scipy.sparse import lil_array
-    from scipy.sparse import csr_array
-    from sklearn.cluster import SpectralClustering
     from sklearn.metrics import silhouette_score
     from sklearn.neighbors import sort_graph_by_row_values
     from collections import defaultdict
@@ -141,17 +182,31 @@ def parse_catalog_func(WORKING_DIR, inputs=(), outputs=()):
     return True
 
 @bash_app(cache=True)
-def find_orfs(name: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=()):
+def find_orfs(name: str, CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=(), params = None):
     import os
     os.chdir(WORKING_DIR)
     subject = inputs[0]
     output = outputs[0]
     orf_output = f"{output}.tmporf"
     PWD = os.getcwd()
-    return f'''orfipy --dna {orf_output} --ignore-case --outdir {PWD} --min 1000 {subject} && cat {orf_output} | {SHARED_PATH}/seqkit replace --f-by-name -p '.*' -r "{name}_gene{{nr}}" > {output} && rm {orf_output} && echo {output}'''
+    command = f'''orfipy --dna {orf_output} --ignore-case --outdir {PWD}'''
+    if params:
+        if params['start'] != None:
+            command += f" --start {','.join(params['start'])}"
+        if params['stop'] != None:
+            command += f" --stop {','.join(params['stop'])}"
+        if params['min'] != None:
+            command += f" --min {params['min']}"
+        if params['max'] != None:
+            command += f" --max {params['max']}"
+    else:
+        command += " --min 1000"
+    command += f''' {subject}'''
+    command += f''' && cat {orf_output} | {SHARED_PATH}/seqkit replace --f-by-name -p '.*' -r "{name}_gene{{nr}}" > {output} && rm {orf_output} && echo {output}'''
+    return command
 
 @join_app
-def start_find_orfs(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=()):
+def start_find_orfs(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, inputs=(), outputs=(), params=None):
     from parsl import bash_app
     from parsl.data_provider.files import File
     tasks = []
@@ -161,7 +216,7 @@ def start_find_orfs(CATALOG_PATH: str, SHARED_PATH: str, WORKING_DIR: str, input
     for line in lines:
         name, input_file = line.split()
         output_file = File(f"{WORKING_DIR}/blast_{name}.fasta")
-        app = find_orfs(name, CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[File(f"{CATALOG_PATH}/{input_file}")], outputs=[output_file])
+        app = find_orfs(name, CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[File(f"{CATALOG_PATH}/{input_file}")], outputs=[output_file], params=params)
         output_files.append(app.outputs[0])
     return output_files
 
@@ -170,23 +225,35 @@ def build_blast_db(WORKING_DIR: str, inputs=(), outputs=()): # in: cat *.fasta >
     return f'''cd {WORKING_DIR} && rm -f genes.db* && cat {WORKING_DIR}/*.fasta > all_species.all_fasta && makeblastdb -input_type fasta -in all_species.all_fasta -blastdb_version 5 -title "grouping genes" -dbtype nucl -out {outputs[0]} && touch {outputs[0]}'''
 
 @bash_app(cache=True)
-def search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), outputs=()):
+def search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), outputs=(), params = None):
     import os
     os.chdir(WORKING_DIR)
     query = inputs[0]
     database = inputs[1]
     outfile = outputs[0]
-    return f'''blastn -query {query} -db {database} -out {outfile} -task dc-megablast -evalue {blast_evalue} -outfmt "6 qaccver saccver evalue" -num_threads 2'''
+    base_command =  f'''blastn -query {query} -db {database} -out {outfile} -task dc-megablast -evalue {blast_evalue} -outfmt "6 qaccver saccver evalue" -num_threads 2'''
+    if params:
+        if params['word_size']:
+            base_command += f" -word_size {params['word_size']}"
+        if params['gapopen']:
+            base_command += f" -gapopen {params['gapopen']}"
+        if params['gapextend']:
+            base_command += f" -gapexend {params['gapextend']}"
+        if params['reward']:
+            base_command += f" -reward {params['reward']}"
+        if params['penalty']:
+            base_command += f" -penalty {params['penalty']}"    
+    return base_command
 
 @join_app
-def start_search_blast(WORKING_DIR: str, blast_evalue: str, inputs=()):
+def start_search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), params=None):
     database = inputs[0]
     queries = inputs[1]
     queries.extend(inputs[2])
     output_files = []
     for query in queries:
         fileout = File(f"{query.filepath}.tab")
-        output_files.append(search_blast(WORKING_DIR, blast_evalue, inputs=[query, database], outputs=[fileout]).outputs[0])
+        output_files.append(search_blast(WORKING_DIR, blast_evalue, inputs=[query, database], outputs=[fileout], params=params).outputs[0])
     return output_files
 
 @bash_app(cache=True)
@@ -194,15 +261,13 @@ def copy_blast_to_csv(WORKING_DIR: str, inputs=(), outputs=()):
     return f'''cd {WORKING_DIR} && cat {' '.join(f.filepath for f in inputs[0])} > {outputs[0]}'''
 
 @python_app(cache=True)
-def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
+def group(WORKING_DIR, max_group_size, inputs=(), outputs=(), params=None):
     import os
     os.chdir(WORKING_DIR)
     import csv
     import numpy as np
     from sklearn.cluster import DBSCAN
     from scipy.sparse import lil_array
-    from scipy.sparse import csr_array
-    from sklearn.cluster import SpectralClustering
     from sklearn.metrics import silhouette_score
     from sklearn.neighbors import sort_graph_by_row_values
     from collections import defaultdict
@@ -210,6 +275,13 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
 
     # Define the path to your BLAST results file
     blast_results_file = inputs[0]  # Replace with your file path
+    
+    # Get parameters
+    eps = 1
+    min_samples = 3
+    if params:
+        eps = params['eps'] if params['eps'] != None else eps
+        min_samples = params['min_samples'] if params['min_samples'] != None else min_samples
 
     # Define the minimum number of clusters as 1/N (N specified via command line)
     # Replace N with the appropriate value or use a command-line argument parser
@@ -270,7 +342,7 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
 
     # Compute DBSCAN
     # whether eps is 0.1 or 1, the groups are the same (above the threshold of the blast search)
-    db = DBSCAN(metric="precomputed", eps = 1, min_samples=3, n_jobs=-1).fit(distance_matrix)
+    db = DBSCAN(metric="precomputed", eps = eps, min_samples = min_samples, n_jobs=-1).fit(distance_matrix)
     labels = db.labels_
     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
     n_noise_ = list(labels).count(-1)
@@ -297,34 +369,68 @@ def group(WORKING_DIR, max_group_size, inputs=(), outputs=()):
         for filename in output_files:
             print(filename, file=fout)
 
-@bash_app(cache=True)
-def seq_list_to_alignment(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=()):
-    input_file = inputs[0]
-    output_file = outputs[0]
-    rm_input_file = ""
-    rm_fasta = ""
-    if remove_files:
-        rm_input_file = f'&& rm {input_file}'
-        rm_fasta = f'&& rm {input_file}.fasta'
-    
-    # TODO: seqkit must be failing because {input_file} doesn't exist when it's supposed to
-    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/all_species.all_fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && mafft --auto --thread -1 {input_file}.fasta > {input_file}.aln {rm_fasta} && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file} && echo "alignment output at {output_file}"'''
 
 @bash_app(cache=True)
-def alignment_to_gene_tree(remove_files: bool, inputs=(), outputs=()):
+def seq_list_to_alignment(WORKING_DIR: str, SHARED_PATH: str, remove_files: bool, inputs=(), outputs=(), params=None):
     input_file = inputs[0]
+    output_file = outputs[0]
+    rm_fasta = ""
+    if remove_files:
+        rm_fasta = f'&& rm {input_file}.fasta'
+    mafft_params_str = ""
+    if params:
+        if params['op']:
+            mafft_params_str += f" --op {params['op']}"
+        if params['ep']:
+            mafft_params_str += f" --ep {params['ep']}"
+        if params['maxiterate']:
+            mafft_params_str += f" --maxiterate {params['maxiterate']}"
+    return f'''search_list=$(grep -f {input_file} -l {WORKING_DIR}/all_species.all_fasta) && {SHARED_PATH}/seqkit grep -f {input_file} -o {input_file}.fasta ${{search_list}} && mafft --auto --thread -1 {mafft_params_str} {input_file}.fasta > {input_file}.aln {rm_fasta} && sed -i 's/_gene:.*$//g' {input_file}.aln && sed -i 's/_CDS:.*$//g' {input_file}.aln && sed -i 's/_ORF:.*$//g' {input_file}.aln && {SHARED_PATH}/seqkit rmdup -n {input_file}.aln > {input_file}.tmp && mv {input_file}.tmp {output_file} && echo "alignment output at {output_file}"'''
+
+
+@bash_app(cache=True)
+def alignment_to_gene_tree(remove_files: bool, inputs=(), outputs=(), params = None):
+    input_file = inputs[0]
+    output_prefix = inputs[0]
     rm_aln = ""
     if remove_files:
         rm_aln = f'&& rm {input_file}'
-    # rm -f {input_file}.raxml.* is to prevent errors when the app is being retried
-    return f'''echo "running raxml-ng with input of {input_file}" && rm -f {input_file}.raxml.* && raxml-ng --search1 --msa {input_file} --model GTR+G --prefix {input_file}'''
+    default_raxml_params = {
+        'tree': 'rand{1}',  # Default tree specification
+        'model': 'GTR+G',  # Default model
+        'opt_model': True,  # Default optimization of model
+        'opt_branches': True,  # Default optimization of branches
+        'blmin': 1e-6,  # Default minimum branch length
+        'blmax': 100,  # Default maximum branch length
+    }
+    raxml_command = f'''raxml-ng --msa {input_file} --prefix {output_prefix}'''
+    if params:
+        if params['tree']:
+            raxml_command += f" --tree {params['tree']}"
+        else:
+            raxml_command += f" --search1"
+        if params['model']:
+            raxml_command += f" --model {params['model']}"
+        else:
+            raxml_command += f" --model {default_raxml_params['model']}"
+        if params['opt_model']:
+            raxml_command += " --opt_model"
+        if params['opt_branches']:
+            raxml_command += " --opt_branches"
+        if params['blmin']:
+            raxml_command += f" --blmin {params['blmin']}"
+        if params['blmax']:
+            raxml_command += f" --blmax {params['blmax']}"
+    else:
+        raxml_command += f" --search1 --model {default_raxml_params['model']}"
+    return f'''echo "running raxml-ng with input of {input_file}" && rm -f {input_file}.raxml.* && {raxml_command}'''
 
 @bash_app(cache=True)
 def select_random_genes(max_trees, inputs=(), outputs=()):
     return f'''shuf -n {max_trees} {inputs[0]} > {outputs[0]}'''
 
 @join_app
-def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_files: bool, inputs=(), outputs=()):
+def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_files: bool, inputs=(), outputs=(), mparams = None, rparams = None):
     with open(inputs[0], 'r') as fin:
         genes_for_trees = fin.readlines()
     tree_files = []
@@ -332,8 +438,8 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
         gene_file = gene_file.strip()
         alignment_file = File(f"{gene_file}.aln")
         tree_file = File(f"{gene_file}.aln.raxml.bestTree")
-        align_task = seq_list_to_alignment(WORKING_DIR, SHARED_PATH, remove_files, inputs=[gene_file], outputs=[alignment_file])
-        tree_task = alignment_to_gene_tree(remove_files, inputs=[align_task.outputs[0]], outputs=[tree_file])
+        align_task = seq_list_to_alignment(WORKING_DIR, SHARED_PATH, remove_files, inputs=[gene_file], outputs=[alignment_file], params = mparams)
+        tree_task = alignment_to_gene_tree(remove_files, inputs=[align_task.outputs[0]], outputs=[tree_file], params = rparams)
         # TODO: remove intermediate files if remove_files
         tree_files.append(tree_task.outputs[0])
     with open(outputs[0], 'w') as fout:
@@ -342,9 +448,15 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
     return tree_files
 
 @bash_app(cache=True)
-def astralpro(inputs=(), outputs=()):
+def astralpro(inputs=(), outputs=(), params = None):
     bestTrees = ' '.join(f.filepath for f in inputs)
-    return f'''cat {bestTrees} > all_trees.out && sed -i 's/_gene[^:]*//g' all_trees.out && sed -i 's/_ORF[^:]*//g' all_trees.out && sed -i 's/_DN[^:]*//g' all_trees.out && astral-pro -i all_trees.out -o {outputs[0]}'''
+    astralpro_command = f"astral-pro -i all_trees.out -o {outputs[0]}"
+    if params:
+        if params['round']:
+            astralpro_command += f" --round {params['round']}"
+        if params['subsample']:
+            astralpro_command += f" --subsample {params['subsample']}"
+    return f'''cat {bestTrees} > all_trees.out && sed -i 's/_gene[^:]*//g' all_trees.out && sed -i 's/_ORF[^:]*//g' all_trees.out && sed -i 's/_DN[^:]*//g' all_trees.out && {astralpro_command}'''
 
 @python_app(cache=True)
 def make_temp_dir(input_file: str, output_file: str):
@@ -366,7 +478,19 @@ if __name__ == "__main__":
         parser.add_argument('-g', '--max_group_size', help='maximum number of sequences permitted in a gene group (default:  %(default)s)', default=100, type=int, required=False)
         parser.add_argument('-e', '--blast_evalue', help='evalue used for blastn search in finding related gene sequences (default:  %(default)s)', default='1e-20', type=str, required=False)
         parser.add_argument('-f', '--temp_files', help='keep intermediate files, including gene trees  (default:  %(default)s)', type=bool, default=False, required=False)
+        parser.add_argument('-c', '--config_file', help='path to configuration file (optional)', type=str, required=False)  # New argument for config file
         args = parser.parse_args()
+
+        # Read configuration file if provided
+        config_params = None
+        dbscan_params = None
+        blastn_params = None
+        orfipy_params = None
+        mafft_params = None
+        raxml_params = None
+        astral_pro_params = None
+        if args.config_file:
+            dbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_pro_params = read_config(args.config_file)  # Assuming read_config returns a dictionary of parameters
 
         catalog_file_name = os.path.abspath(args.input_file)
         output_file_name = os.getcwd() + "/" + args.output_file
@@ -420,7 +544,7 @@ if __name__ == "__main__":
         print("Adding app to workflow to relabel genes")
         relabel_genes_future = start_relabel_genes(CATALOG_PATH, SHARED_PATH, WORKING_DIR,inputs=[combine_genes_and_annotations.outputs[0]])
         print("Adding app to workflow to find ORFs in unannotated genomes")
-        find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file])
+        find_orfs_future = start_find_orfs(CATALOG_PATH, SHARED_PATH, WORKING_DIR, inputs=[parse_catalog_future.outputs[1]], outputs=[all_genes_file], params=orfipy_params)
         print("Adding app to workflow to build BLAST Database")
         build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0], relabel_genes_future.result()], outputs=[blast_db_file])
         print("Adding app to workflow to search BLAST DB for matching sequences")
@@ -430,44 +554,44 @@ if __name__ == "__main__":
         grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
         print("Adding app to workflow to generate gene trees")
         gene_list_future = select_random_genes(args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[selected_group_list_file])
-        gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file])
-        print("Adding app to workflow to generate species tree")
-        species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file])
+        gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file]) 
+        print("Adding app to workflow to generate species tree", flush=True)
+        species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file], params = astral_pro_params)
         # AppFuture result() is a blocking call until the app has completed
         # Wait for parsing catalog
         parse_catalog_future.result()
-        print("Parsed catalog")
+        print("Parsed catalog", flush=True)
         # Wait for annotations
         start_annotations.result()
         combine_genes_and_annotations.result()
-        print("Found sequences from annotations")
+        print("Found sequences from annotations", flush=True)
         # Wait for relabeling genes
         relabel_genes_future.result()
-        print("Relabeled genes")
+        print("Relabeled genes", flush=True)
         # Wait for finding ORFs
         find_orfs_future.result()
-        print("Found ORFs")
+        print("Found ORFs", flush=True)
         # Wait for building BLAST DB
         blast_search_future.result()
-        print("Built BLAST DB")
+        print("Built BLAST DB", flush=True)
         # Wait for searching BLAST
         blast_search_future.result()
         copy_future.result()
-        print("Searched BLAST DB")
+        print("Searched BLAST DB", flush=True)
         # Wait for grouping
         grouping_future.result()
-        print("Grouped sequences")
+        print("Grouped sequences", flush=True)
         # Wait for gene alignments
         gene_list_future.result()
-        print("Aligned gene sequences")
+        print("Aligned gene sequences", flush=True)
         # Wait for gene trees
         gene_tree_future.result()
-        print("Constructed gene trees")
+        print("Constructed gene trees", flush=True)
         # Wait for species tree
         species_tree_future.result()
         if not args.temp_files:
             import shutil
             shutil.rmtree(WORKING_DIR)
 
-        print("Constructed species tree:")
+        print("Constructed species tree:", flush=True)
         system(f"cat {output_tree_file}")

@@ -22,9 +22,10 @@ config = Config(
                     max_blocks=4,
                     scheduler_options='',
                     cmd_timeout=60,
+                    walltime='2:00:00',
                     parallelism=0.1, # if no workload, no blocks provisioned
                     launcher=SrunLauncher(),
-                    worker_init='conda activate poplar_env; export PATH=$PATH:$BLAST:$RAXML:$ASTRAL',  # requires conda environment with parsl
+                    worker_init='conda activate poplar_env; export PATH=$PATH::/home/erkonin/feeds/poplar/dependencies/ncbi-blast-2.16.0+/bin:/home/erkonin/feeds/poplar/dependencies:/home/erkonin/feeds/poplar/dependencies/ASTER/bin',  # requires conda environment with parsl
                ),
           )
      ],

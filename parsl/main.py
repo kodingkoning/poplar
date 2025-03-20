@@ -21,6 +21,7 @@ def read_config(file_path):
         'eps': config.getfloat('DBSCAN', 'cluster_selection_epsilon', fallback=1),
     }
     blastn_params = {
+        'max_search_queries_per_app' : config.getint('parsl', 'max_search_queries_per_app', fallback=None),
         'word_size': config.getint('blastn', 'word_size', fallback=None),
         'gapopen': config.getint('blastn', 'gapopen', fallback=None),
         'gapextend': config.getint('blastn', 'gapextend', fallback=None),
@@ -68,6 +69,7 @@ def check_imports():
     import tempfile
     from parsl.data_provider.files import File
     from parsl import bash_app
+    import glob
     return True
 
 # Required for making File compatible with checkpointing
@@ -238,15 +240,23 @@ def search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), outputs=(), par
         if params['gapopen']:
             base_command += f" -gapopen {params['gapopen']}"
         if params['gapextend']:
-            base_command += f" -gapexend {params['gapextend']}"
+            base_command += f" -gapextend {params['gapextend']}"
         if params['reward']:
             base_command += f" -reward {params['reward']}"
         if params['penalty']:
             base_command += f" -penalty {params['penalty']}"    
-    return base_command
+    return base_command + f" && rm {query}"
+
+@bash_app(cache=True)
+def split_fasta(WORKING_DIR: str, SHARED_PATH: str, max_queries: int, inputs=()):
+    return f"{SHARED_PATH}/seqkit split --force --by-size {max_queries} {inputs[0]}"
+
+@bash_app(cache=True)
+def copy_files_with_pattern_to_file(DIR: str, inputs=(), outputs=()):
+    return f"cd {DIR} && echo 'copying to {outputs[0]}' && rm -f {outputs[0]} && for i in {inputs[0]}; do cat $i >> {outputs[0]} && rm $i; done && echo 'copied to {outputs[0]}'"
 
 @join_app
-def start_search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), params=None):
+def start_search_blast(WORKING_DIR: str, blast_evalue: str, params=None, inputs=(), outputs=()):
     database = inputs[0]
     queries = inputs[1]
     queries.extend(inputs[2])
@@ -254,11 +264,52 @@ def start_search_blast(WORKING_DIR: str, blast_evalue: str, inputs=(), params=No
     for query in queries:
         fileout = File(f"{query.filepath}.tab")
         output_files.append(search_blast(WORKING_DIR, blast_evalue, inputs=[query, database], outputs=[fileout], params=params).outputs[0])
+    with open(outputs[0], 'w') as fout:
+        for filename in output_files:
+            print(filename.filepath, file=fout)
     return output_files
+
+@join_app
+def start_search_blast_with_split(WORKING_DIR: str, SHARED_PATH: str, blast_evalue: str, params=None, inputs=(), outputs=()):
+    import glob
+    database = inputs[0]
+    queries = inputs[1]
+    queries.extend(inputs[2])
+    output_dirs = []
+    output_files = []
+    file_splits = []
+    all_search_results = []
+    max_search_queries = params['max_search_queries_per_app']
+    for query in queries:
+        file_splits.append(split_fasta(WORKING_DIR, SHARED_PATH, max_search_queries, inputs=[query]))
+    for split in file_splits:
+        split.result() # wait for files to be split before proceeding
+    for query in queries:
+        dir = f"{query}.split"
+        for file in glob.glob(f"{query}.split/*.fasta"):
+            filein = File(f"{file}")
+            fileout = File(f"{file}.tab")
+            output_files.append(search_blast(WORKING_DIR, blast_evalue, inputs=[filein, database], outputs=[fileout], params=params).outputs[0])
+        output_dirs.append(f"{dir}")
+    for output_file in output_files:
+        output_file.result() # wait for searches before proceeding
+    for output_dir, query in zip(output_dirs, queries):
+        search_results = File(f"{query}.tab")
+        all_search_results.append(copy_files_with_pattern_to_file(output_dir, inputs=["*.fasta.tab"], outputs=[search_results]).outputs[0])
+    with open(outputs[0], 'w') as fout:
+        for filename in all_search_results:
+            print(filename.filepath, file=fout)
+    return all_search_results
 
 @bash_app(cache=True)
 def copy_blast_to_csv(WORKING_DIR: str, inputs=(), outputs=()):
-    return f'''cd {WORKING_DIR} && cat {' '.join(f.filepath for f in inputs[0])} > {outputs[0]}'''
+    with open(inputs[0], 'r') as fin:
+        lines = fin.readlines()
+    file_combine_cmd = ""
+    for input in lines:
+        query = input.strip()
+        file_combine_cmd += f"echo 'copying {query} in copy_blast_to_csv' && cat {query} >> {outputs[0].filepath} && rm {query} && "
+    return f'''cd {WORKING_DIR} && rm -f {outputs[0].filepath} && {file_combine_cmd} echo "{outputs[0].filepath}"'''
 
 @python_app(cache=True)
 def group(WORKING_DIR, max_group_size, inputs=(), outputs=(), params=None):
@@ -449,7 +500,9 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
 
 @bash_app(cache=True)
 def astralpro(inputs=(), outputs=(), params = None):
-    bestTrees = ' '.join(f.filepath for f in inputs)
+    with open(inputs[0], 'r') as fin:
+        lines = fin.readlines()
+    bestTrees = ' '.join(f.strip() for f in lines)
     astralpro_command = f"astral-pro -i all_trees.out -o {outputs[0]}"
     if params:
         if params['round']:
@@ -482,7 +535,6 @@ if __name__ == "__main__":
         args = parser.parse_args()
 
         # Read configuration file if provided
-        config_params = None
         dbscan_params = None
         blastn_params = None
         orfipy_params = None
@@ -531,6 +583,7 @@ if __name__ == "__main__":
         query_genes_file = File(WORKING_DIR + "/query_genes.query_fasta")
         all_genes_file = File(WORKING_DIR + "/all_species.all_fasta")
         blast_db_file = File(WORKING_DIR + "/genes.db")
+        blast_search_results = File(WORKING_DIR + "/blast_search_results.txt")
         blast_csv = File(WORKING_DIR + "/blast_results.csv")
         group_list_file = File(WORKING_DIR + "/grouplist.txt")
         selected_group_list_file = File(WORKING_DIR + "/selectedgrouplist.txt")
@@ -549,15 +602,19 @@ if __name__ == "__main__":
         print("Adding app to workflow to build BLAST Database")
         build_blast_db_future = build_blast_db(WORKING_DIR, inputs=[find_orfs_future.outputs[0], relabel_genes_future.result()], outputs=[blast_db_file])
         print("Adding app to workflow to search BLAST DB for matching sequences")
-        blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, inputs=[build_blast_db_future.outputs[0], relabel_genes_future.result(), find_orfs_future.result()])
-        copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future], outputs=[blast_csv])
+        blast_search_future = None
+        if blastn_params == None or blastn_params['max_search_queries_per_app'] == None:
+            blast_search_future = start_search_blast(WORKING_DIR, args.blast_evalue, params=blastn_params, inputs=[build_blast_db_future.outputs[0], relabel_genes_future.result(), find_orfs_future.result()], outputs=[blast_search_results])
+        else:
+            blast_search_future = start_search_blast_with_split(WORKING_DIR, SHARED_PATH, args.blast_evalue, params=blastn_params, inputs=[build_blast_db_future.outputs[0], relabel_genes_future.result(), find_orfs_future.result()], outputs=[blast_search_results])
+        copy_future = copy_blast_to_csv(WORKING_DIR, inputs=[blast_search_future.outputs[0]], outputs=[blast_csv])
         print("Adding app to workflow to group the sequences")
         grouping_future = group(WORKING_DIR, args.max_group_size, inputs=[copy_future.outputs[0]], outputs=[group_list_file])
         print("Adding app to workflow to generate gene trees")
         gene_list_future = select_random_genes(args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[selected_group_list_file])
         gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file]) 
         print("Adding app to workflow to generate species tree", flush=True)
-        species_tree_future = astralpro(inputs=gene_tree_future.result(), outputs=[output_tree_file], params = astral_pro_params)
+        species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file], params = astral_pro_params)
         # AppFuture result() is a blocking call until the app has completed
         # Wait for parsing catalog
         parse_catalog_future.result()

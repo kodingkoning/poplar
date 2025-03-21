@@ -1,5 +1,4 @@
 ncbi_dataset
-runinfo
 __pycache__
 poplar_tmp*/
 *.out
@@ -9,3 +8,9 @@ ncbi_dataset.zip
 Miniforge3-Linux-x86_64.sh
 data/
 *.tree
+trees/
+old_trees/
+runinfo/
+poplar_runinfo/
+.vscode/
+runinfo*

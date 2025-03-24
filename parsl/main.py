@@ -47,11 +47,12 @@ def read_config(file_path):
         'blmin': config.getfloat('raxml', 'blmin', fallback=None),
         'blmax': config.getfloat('raxml', 'blmax', fallback=None),
     }
-    astral_pro_params = {
-        'round': config.getint('astral-pro', 'round', fallback=None),
-        'subsample': config.getint('astral-pro', 'subsample', fallback=None),
+    astral_params = {
+        'astral-pro' : config.getboolean('astral', 'astral-pro', fallback=True),
+        'round': config.getint('astral', 'round', fallback=None),
+        'subsample': config.getint('astral', 'subsample', fallback=None),
     }
-    return dbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_pro_params
+    return dbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_params
 
 # Packages used in apps. Import to confirm correct installation
 @python_app
@@ -499,17 +500,26 @@ def start_gene_trees(WORKING_DIR: str, SHARED_PATH: str, max_trees: int, remove_
     return tree_files
 
 @bash_app(cache=True)
-def astralpro(inputs=(), outputs=(), params = None):
+def astral(inputs=(), outputs=(), params = None):
     with open(inputs[0], 'r') as fin:
         lines = fin.readlines()
     bestTrees = ' '.join(f.strip() for f in lines)
-    astralpro_command = f"astral-pro -i all_trees.out -o {outputs[0]}"
+    astral_command = ""
     if params:
-        if params['round']:
-            astralpro_command += f" --round {params['round']}"
-        if params['subsample']:
-            astralpro_command += f" --subsample {params['subsample']}"
-    return f'''cat {bestTrees} > all_trees.out && sed -i 's/_gene[^:]*//g' all_trees.out && sed -i 's/_ORF[^:]*//g' all_trees.out && sed -i 's/_DN[^:]*//g' all_trees.out && {astralpro_command}'''
+        if params['astral-pro']:
+            astral_command = f"astral-pro -i all_trees.out -o {outputs[0]}"
+            if params['round']:
+                astral_command += f" --round {params['round']}"
+            if params['subsample']:
+                astral_command += f" --subsample {params['subsample']}"
+        else:
+            astral_command = f"astral4 -o {outputs[0]}"
+            if params['round']:
+                astral_command += f" -r {params['round']}"
+            if params['subsample']:
+                astral_command += f" -s {params['subsample']}"
+            astral_command += " all_trees.out"
+    return f'''cat {bestTrees} > all_trees.out && sed -i 's/_gene[^:]*//g' all_trees.out && sed -i 's/_ORF[^:]*//g' all_trees.out && sed -i 's/_DN[^:]*//g' all_trees.out && {astral_command}'''
 
 @python_app(cache=True)
 def make_temp_dir(input_file: str, output_file: str):
@@ -540,9 +550,9 @@ if __name__ == "__main__":
         orfipy_params = None
         mafft_params = None
         raxml_params = None
-        astral_pro_params = None
+        astral_params = None
         if args.config_file:
-            dbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_pro_params = read_config(args.config_file)  # Assuming read_config returns a dictionary of parameters
+            dbscan_params, blastn_params, orfipy_params, mafft_params, raxml_params, astral_params = read_config(args.config_file)  # Assuming read_config returns a dictionary of parameters
 
         catalog_file_name = os.path.abspath(args.input_file)
         output_file_name = os.getcwd() + "/" + args.output_file
@@ -614,7 +624,7 @@ if __name__ == "__main__":
         gene_list_future = select_random_genes(args.max_trees, inputs=[grouping_future.outputs[0]], outputs=[selected_group_list_file])
         gene_tree_future = start_gene_trees(WORKING_DIR, SHARED_PATH, args.max_trees, not args.temp_files, inputs=[gene_list_future.outputs[0]], outputs=[gene_tree_list_file]) 
         print("Adding app to workflow to generate species tree", flush=True)
-        species_tree_future = astralpro(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file], params = astral_pro_params)
+        species_tree_future = astral(inputs=[gene_tree_future.outputs[0]], outputs=[output_tree_file], params = astral_params)
         # AppFuture result() is a blocking call until the app has completed
         # Wait for parsing catalog
         parse_catalog_future.result()

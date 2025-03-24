@@ -102,6 +102,46 @@ Options for Poplar are available in the help menu, by running `parsl/main.py -h`
 - `-e` or `--blast_evalue`: set maximum evalue for blastn search in finding related gene sequences. Defaults to 1e-20
 - `-t` or `--max_trees`: set the maximum number of gene trees to construct. Defaults to 50
 - `-g` or `--max_group_size`: set the maximum number of sequences permitted in a gene group. Defaults to 100
+- `-c` or `--config_file`: path to configuration file. Optional
+
+#### Configuration File:
+
+Examples of configuration files are [an empty configuration](files/empty.ini) or a [configuration with default values](files/default.ini). If no configuration file is provided, Poplar has fallback values to use.
+
+As shown in the configuration files, the options are:
+
+- parsl
+	- `max_search_queries_per_app`: Maximum number of queries to include per BLAST search app invocation
+- [DBSCAN](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.DBSCAN.html)
+	- `min_samples`: Minimum number of samples for a point to be considered as a core point
+	- `eps`: Maximum distance between two samples to be considered as in the neighborhood of the other
+- [blastn](https://www.ncbi.nlm.nih.gov/books/NBK279684/table/appendices.T.blastn_application_options/)
+	- `word_size`: Length of initial exact match
+	- `gapopen`: Cost to open a gap
+	- `gapextend`: Cost to extend a gap
+	- `reward`: Reward for a nucleotide gap
+	- `penalty`: Penalty for a nucleotide mismatch
+- [orfipy](https://pypi.org/project/orfipy/)
+	- `min`: Minimum ORF length
+	- `max`: Maximum ORF length
+	- `start`: List of start codons to use
+	- `stop`: List of stop codons to sue
+- [mafft](https://mafft.cbrc.jp/alignment/software/manual/manual.html#lbAI)
+	- `op`: Gap opening penalty at group-to-group alignment
+	- `ep`: Offset value, which works like gap extension penalty, for group-to-group alignment
+	- `maxiterate`: Cycles of iterative refinement are performed
+- raxml
+	- `tree`: In format `rand{N},pars{N}` where N = number fo starting trees for random and parsimony.
+	- `model`: In format `<name>+G[n]+<Freqs>` for model specification
+	- `opt-model`: ML optimization of all model parameters (on or off)
+	- `opt-branches`: ML optimization of all branch lengths (on or off)
+	- `blmin`: Minimum branch length
+	- `blmax`: Maximum branch length
+- astral
+	- `astral-pro`: If True (default), uses [ASTRAL-Pro](https://github.com/chaoszhang/ASTER/blob/master/tutorial/astral-pro3.md). If False, uses [ASTRAL-IV](https://github.com/chaoszhang/ASTER/blob/master/tutorial/astral4.md)
+	- `round`: Number of rounds of search
+	- `subsample`: Number of rounds of subsampling
+
 
 ## Output
 
